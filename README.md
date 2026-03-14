@@ -167,24 +167,9 @@ External Services
 
 # 🎬 Demo
 
-You can add an animated demo of the project.
 
-Example folder structure:
-
-```
-demo
- └ demo.gif
-```
-
-Add this inside the README:
-
-```markdown
 ![GRIP Demo](demo/demo.gif)
-```
 
-This helps visitors **instantly understand how the platform works**.
-
----
 
 # 📂 Project Structure
 
