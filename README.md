@@ -216,7 +216,6 @@ Backend | Python, Flask |
 Real-time Communication | Socket.IO |
 Database | SQLite |
 Authentication | JWT |
-SMS Verification | Twilio API |
 Mapping | OpenStreetMap, Leaflet |
 AI Categorization | NLP-based text classification |
 
@@ -227,5 +226,4 @@ AI Categorization | NLP-based text classification |
 ### Clone the Repository
 
 ```bash
-git clone https://github.com/your-username/grip-platform.git
-cd grip-platform
+git clone https://github.com/syed-adnan-01/grip-website.git
