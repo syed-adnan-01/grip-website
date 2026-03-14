@@ -71,8 +71,7 @@ Ensure you have the following installed on your local machine:
 
 **1. Clone the repository**
 ```bash
-git clone [https://github.com/your-username/grip-platform.git](https://github.com/your-username/grip-platform.git)
-cd grip-platform
+git clone https://github.com/syed-adnan-01/grip-website.git
 
 ```
 
