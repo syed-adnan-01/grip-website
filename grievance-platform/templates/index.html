@@ -694,6 +694,10 @@ function initMap(){
     if(marker) map.removeLayer(marker);
     marker = L.marker([lat, lng]).addTo(map);
     
+    // Update hidden inputs
+    document.getElementById('latInput').value = lat;
+    document.getElementById('lngInput').value = lng;
+    
     // Reverse geocoding using Nominatim
     try{
       const r = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`);
@@ -719,8 +723,12 @@ document.getElementById('getLocationBtn').addEventListener('click', function(){
         const d = await r.json();
         const address = d.display_name || `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`;
         document.getElementById('areaInput').value = address;
+        document.getElementById('latInput').value = latitude;
+        document.getElementById('lngInput').value = longitude;
       }catch(err){
         document.getElementById('areaInput').value = `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`;
+        document.getElementById('latInput').value = latitude;
+        document.getElementById('lngInput').value = longitude;
       }
     }, function(err){
       showToast('❌ Location Error', 'Unable to get your location.');

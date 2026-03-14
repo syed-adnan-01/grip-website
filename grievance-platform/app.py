@@ -22,7 +22,12 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s: %(mes
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'change-me')
-app.config['UPLOAD_FOLDER'] = 'static/uploads'
+
+if os.environ.get('VERCEL'):
+    app.config['UPLOAD_FOLDER'] = '/tmp/uploads'
+else:
+    app.config['UPLOAD_FOLDER'] = 'static/uploads'
+
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
 
 socketio = SocketIO(app, cors_allowed_origins="*")
@@ -479,6 +484,10 @@ def submit_complaint():
         latitude = data.get('latitude')
         longitude = data.get('longitude')
         
+        # Convert empty strings to None
+        if not latitude: latitude = None
+        if not longitude: longitude = None
+        
         image_path = None
         if 'image' in request.files:
             file = request.files['image']
@@ -851,16 +860,18 @@ def setup_database():
             latitude REAL, longitude REAL, created_at TEXT, resolved_at TEXT)""")
         
         # Backward compatibility for existing tables
-        try: cursor.execute("ALTER TABLE complaints ADD COLUMN priority TEXT DEFAULT 'Medium'")
-        except: pass
-        try: cursor.execute("ALTER TABLE complaints ADD COLUMN updated_by TEXT DEFAULT ''")
-        except: pass
-        try: cursor.execute("ALTER TABLE complaints ADD COLUMN sentiment INTEGER DEFAULT 3")
-        except: pass
-        try: cursor.execute("ALTER TABLE complaints ADD COLUMN latitude REAL")
-        except: pass
-        try: cursor.execute("ALTER TABLE complaints ADD COLUMN longitude REAL")
-        except: pass
+        columns = [
+            ("priority", "TEXT DEFAULT 'Medium'"),
+            ("updated_by", "TEXT DEFAULT ''"),
+            ("sentiment", "INTEGER DEFAULT 3"),
+            ("latitude", "REAL"),
+            ("longitude", "REAL")
+        ]
+        for col_name, col_def in columns:
+            try:
+                cursor.execute(f"ALTER TABLE complaints ADD COLUMN {col_name} {col_def}")
+            except:
+                pass
         
         cursor.execute("""CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT UNIQUE NOT NULL, password_hash TEXT NOT NULL, 
