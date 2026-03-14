@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GRIP — Public Grievance Intelligence & Resolution Platform</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --ink:#0A0A14;--paper:#F4F1EB;--accent:#E63946;--gold:#F4A261;--teal:#2A9D8F;
+  --blue:#264653;--muted:#6B6B7A;--card:#FFFDF7;--border:#DDD9D0;
+  --success:#2A9D8F;--warn:#F4A261;--danger:#E63946;
+}
+html{scroll-behavior:smooth}
+body{font-family:'DM Sans',sans-serif;background:var(--paper);color:var(--ink);min-height:100vh;overflow-x:hidden}
+
+/* NAV */
+nav{position:fixed;top:0;left:0;right:0;z-index:100;background:var(--ink);padding:0 2.5rem;height:60px;display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid var(--accent)}
+.nav-logo{font-family:'Syne',sans-serif;font-weight:800;font-size:1.3rem;color:#fff;letter-spacing:-0.02em}
+.nav-logo span{color:var(--accent)}
+.nav-links{display:flex;gap:0.25rem}
+.nav-links a{color:#ccc;text-decoration:none;font-size:0.85rem;font-weight:500;padding:0.4rem 0.9rem;border-radius:4px;transition:all 0.2s;letter-spacing:0.03em}
+.nav-links a:hover,.nav-links a.active{background:var(--accent);color:#fff}
+
+/* HERO */
+.hero{margin-top:60px;background:var(--ink);color:#fff;padding:5rem 2.5rem 4rem;display:grid;grid-template-columns:1fr 1fr;gap:4rem;align-items:center;max-width:1400px;margin-left:auto;margin-right:auto;margin-top:60px}
+.hero-eyebrow{font-family:'Syne',sans-serif;font-size:0.75rem;letter-spacing:0.15em;text-transform:uppercase;color:var(--accent);margin-bottom:1rem}
+.hero h1{font-family:'Syne',sans-serif;font-size:clamp(2.4rem,4vw,3.8rem);font-weight:800;line-height:1.05;letter-spacing:-0.03em;margin-bottom:1.5rem}
+.hero h1 .highlight{color:var(--accent)}
+.hero-sub{font-size:1.05rem;color:#B0B0BE;line-height:1.7;max-width:480px;font-weight:300}
+.hero-badges{display:flex;gap:0.75rem;margin-top:2rem;flex-wrap:wrap}
+.badge{padding:0.4rem 1rem;border:1px solid #ffffff22;border-radius:100px;font-size:0.78rem;color:#ccc;font-family:'Syne',sans-serif;letter-spacing:0.05em}
+.hero-stats{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem}
+.stat-card{background:#ffffff0A;border:1px solid #ffffff15;border-radius:12px;padding:1.5rem;transition:border-color 0.3s}
+.stat-card:hover{border-color:var(--accent)}
+.stat-num{font-family:'Syne',sans-serif;font-size:2rem;font-weight:800;color:var(--accent)}
+.stat-label{font-size:0.82rem;color:#888;margin-top:0.3rem;letter-spacing:0.04em;text-transform:uppercase}
+
+/* MAIN CONTENT */
+.main-wrap{max-width:1400px;margin:0 auto;padding:3rem 2.5rem}
+
+/* COMPLAINT FORM */
+.section-header{display:flex;align-items:baseline;gap:1rem;margin-bottom:2rem}
+.section-num{font-family:'Syne',sans-serif;font-size:3rem;font-weight:800;color:var(--border);line-height:1}
+.section-title{font-family:'Syne',sans-serif;font-size:1.6rem;font-weight:700;letter-spacing:-0.02em}
+
+.form-card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:2.5rem;position:relative;overflow:hidden}
+.form-card::before{content:'';position:absolute;top:0;left:0;right:0;height:4px;background:linear-gradient(90deg,var(--accent),var(--gold),var(--teal))}
+
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem}
+.form-group{display:flex;flex-direction:column;gap:0.5rem}
+.form-group.full{grid-column:1/-1}
+label{font-size:0.8rem;font-weight:500;letter-spacing:0.06em;text-transform:uppercase;color:var(--muted)}
+input,select,textarea{width:100%;padding:0.8rem 1rem;border:1.5px solid var(--border);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:0.95rem;background:var(--paper);color:var(--ink);transition:border-color 0.2s,box-shadow 0.2s;outline:none}
+input:focus,select:focus,textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px #E6394615}
+textarea{resize:vertical;min-height:100px}
+
+.ai-hint{display:inline-flex;align-items:center;gap:0.4rem;background:#2A9D8F15;border:1px solid #2A9D8F40;color:var(--teal);padding:0.4rem 0.8rem;border-radius:6px;font-size:0.78rem;font-weight:500;margin-top:0.5rem;opacity:0;transition:opacity 0.3s}
+.ai-hint.show{opacity:1}
+.ai-dot{width:6px;height:6px;background:var(--teal);border-radius:50%;animation:pulse 1.5s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
+
+.upload-zone{border:2px dashed var(--border);border-radius:8px;padding:2rem;text-align:center;cursor:pointer;transition:all 0.2s;background:var(--paper)}
+.upload-zone:hover{border-color:var(--accent);background:#E6394608}
+.upload-zone.dragover{border-color:var(--accent);background:#E6394615}
+.upload-icon{font-size:2rem;margin-bottom:0.5rem}
+.upload-text{font-size:0.85rem;color:var(--muted)}
+#imagePreview{display:none;margin-top:1rem}
+#imagePreview img{max-height:200px;border-radius:8px;border:1px solid var(--border)}
+
+.submit-btn{background:var(--accent);color:#fff;border:none;padding:1rem 2.5rem;border-radius:8px;font-family:'Syne',sans-serif;font-size:1rem;font-weight:700;cursor:pointer;letter-spacing:0.05em;transition:all 0.2s;display:flex;align-items:center;gap:0.5rem}
+.submit-btn:hover{background:#C1121F;transform:translateY(-2px);box-shadow:0 8px 20px #E6394640}
+.submit-btn:active{transform:translateY(0)}
+.submit-btn:disabled{background:var(--muted);cursor:not-allowed;transform:none}
+
+/* SUCCESS TOAST */
+.toast{position:fixed;bottom:2rem;right:2rem;background:var(--ink);color:#fff;padding:1rem 1.5rem;border-radius:12px;border-left:4px solid var(--teal);max-width:380px;z-index:999;transform:translateX(120%);transition:transform 0.4s cubic-bezier(0.175,0.885,0.32,1.275)}
+.toast.show{transform:translateX(0)}
+.toast-title{font-family:'Syne',sans-serif;font-weight:700;margin-bottom:0.25rem}
+.toast-body{font-size:0.85rem;color:#aaa}
+
+/* COMPLAINTS LIST */
+.complaints-section{margin-top:3rem}
+.filter-bar{display:flex;gap:1rem;margin-bottom:1.5rem;flex-wrap:wrap;align-items:center}
+.filter-bar select{width:auto;padding:0.6rem 1rem;font-size:0.85rem}
+.filter-bar .refresh-btn{background:var(--ink);color:#fff;border:none;padding:0.6rem 1.2rem;border-radius:8px;font-family:'Syne',sans-serif;font-size:0.82rem;font-weight:600;cursor:pointer;letter-spacing:0.05em;transition:background 0.2s}
+.filter-bar .refresh-btn:hover{background:var(--accent)}
+
+.complaints-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:1.25rem}
+.complaint-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:1.5rem;transition:all 0.2s;position:relative;overflow:hidden}
+.complaint-card:hover{border-color:var(--accent);box-shadow:0 4px 20px #00000010;transform:translateY(-2px)}
+.complaint-card::after{content:'';position:absolute;bottom:0;left:0;right:0;height:3px}
+.complaint-card.Pending::after{background:var(--warn)}
+.complaint-card.Resolved::after{background:var(--teal)}
+.complaint-card.In-Progress::after{background:#4361EE}
+.complaint-card.Rejected::after{background:var(--muted)}
+.card-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:0.75rem;gap:0.5rem}
+.card-title{font-family:'Syne',sans-serif;font-weight:700;font-size:0.95rem;line-height:1.3}
+.card-id{font-size:0.72rem;color:var(--muted);font-family:'Syne',sans-serif;font-weight:600;white-space:nowrap}
+.card-desc{font-size:0.84rem;color:var(--muted);line-height:1.5;margin-bottom:1rem;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.card-meta{display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:0.75rem}
+.tag{padding:0.25rem 0.65rem;border-radius:100px;font-size:0.72rem;font-weight:600;letter-spacing:0.05em;text-transform:uppercase}
+.tag-cat{background:#E6394615;color:var(--accent)}
+.tag-area{background:#2A9D8F15;color:var(--teal)}
+.tag-status-Pending{background:#F4A26115;color:#E07020}
+.tag-status-Resolved{background:#2A9D8F15;color:var(--teal)}
+.tag-status-In-Progress{background:#4361EE15;color:#4361EE}
+.tag-status-Rejected{background:#6B6B7A15;color:var(--muted)}
+.tag-pri-High{background:#E6394615;color:var(--accent)}
+.tag-pri-Medium{background:#F4A26115;color:#E07020}
+.tag-pri-Low{background:#2A9D8F15;color:var(--teal)}
+.card-footer{font-size:0.75rem;color:var(--muted);display:flex;justify-content:space-between;align-items:center}
+.card-citizen{font-weight:500;color:var(--ink)}
+
+/* QUICK LINKS */
+.quick-links{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;margin-top:3rem}
+.quick-link-card{background:var(--ink);color:#fff;border-radius:16px;padding:2rem;text-decoration:none;display:flex;flex-direction:column;gap:1rem;transition:transform 0.2s,box-shadow 0.2s;position:relative;overflow:hidden}
+.quick-link-card::before{content:'';position:absolute;top:-30px;right:-30px;width:120px;height:120px;background:#ffffff08;border-radius:50%}
+.quick-link-card:hover{transform:translateY(-4px);box-shadow:0 12px 30px #00000030}
+.qlc-icon{font-size:2rem}
+.qlc-title{font-family:'Syne',sans-serif;font-weight:800;font-size:1.2rem}
+.qlc-sub{color:#888;font-size:0.85rem;line-height:1.5}
+.qlc-arrow{align-self:flex-end;font-size:1.5rem;color:var(--accent)}
+
+/* LOADING */
+.spinner{display:inline-block;width:18px;height:18px;border:2px solid #ffffff40;border-top-color:#fff;border-radius:50%;animation:spin 0.8s linear infinite;vertical-align:middle}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* RESPONSIVE */
+@media(max-width:768px){
+  .hero{grid-template-columns:1fr;gap:2rem;padding:3rem 1.5rem 2rem}
+  .form-grid{grid-template-columns:1fr}
+  .quick-links{grid-template-columns:1fr}
+  .main-wrap{padding:2rem 1.5rem}
+  nav{padding:0 1.5rem}
+}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-logo">GR<span>IP</span></div>
+  <div class="nav-links">
+    <a href="index.html" class="active">Submit Complaint</a>
+    <span id="authLinks" style="display:none">
+      <a href="dashboard.html" id="navDashboard" style="display:none">Dashboard</a>
+      <a href="citizen_dashboard.html" id="navCitizen" style="display:none">My Complaints</a>
+      <a href="funds.html" id="navFunds" style="display:none">Fund Transparency</a>
+      <a href="community.html">Community</a>
+    </span>
+    <a href="#" id="logoutBtn" style="display:none" onclick="logout(event)">Logout</a>
+    <a href="login.html" id="loginBtn">Login</a>
+  </div>
+</nav>
+
+<div style="background:var(--ink);">
+  <div class="hero">
+    <div>
+      <div class="hero-eyebrow">Government of Karnataka — Bengaluru Municipal Corporation</div>
+      <h1>Public Grievance <span class="highlight">Intelligence</span> & Resolution Platform</h1>
+      <p class="hero-sub">Submit civic complaints, track resolutions, and hold authorities accountable. Powered by AI-driven categorization for faster response.</p>
+      <div class="hero-badges">
+        <span class="badge">🤖 AI Categorization</span>
+        <span class="badge">📊 Live Dashboard</span>
+        <span class="badge">💰 Fund Transparency</span>
+        <span class="badge">🔒 Secure & Anonymous</span>
+      </div>
+    </div>
+    <div class="hero-stats" id="heroStats">
+      <div class="stat-card"><div class="stat-num" id="statTotal">—</div><div class="stat-label">Total Complaints</div></div>
+      <div class="stat-card"><div class="stat-num" id="statPending" style="color:var(--gold)">—</div><div class="stat-label">Pending</div></div>
+      <div class="stat-card"><div class="stat-num" id="statResolved" style="color:var(--teal)">—</div><div class="stat-label">Resolved</div></div>
+      <div class="stat-card"><div class="stat-num" id="statProgress" style="color:#4361EE">—</div><div class="stat-label">In Progress</div></div>
+    </div>
+  </div>
+</div>
+
+<div class="main-wrap">
+  <div style="display:grid;grid-template-columns:1.4fr 1fr;gap:3rem;align-items:start">
+    
+    <!-- FORM -->
+    <div>
+      <div class="section-header">
+        <div class="section-num">01</div>
+        <div class="section-title">Submit a Complaint</div>
+      </div>
+      <div class="form-card">
+        <form id="complaintForm" enctype="multipart/form-data">
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Your Name</label>
+              <input type="text" name="citizen_name" placeholder="Full name (optional)">
+            </div>
+            <div class="form-group">
+              <label>Contact Number</label>
+              <input type="tel" name="citizen_contact" placeholder="10-digit mobile number">
+            </div>
+            <div class="form-group full">
+              <label>Complaint Title *</label>
+              <input type="text" name="title" id="titleInput" placeholder="Brief title e.g. 'Pothole on MG Road near bus stop'" required>
+            </div>
+            <div class="form-group full">
+              <label>Description *</label>
+              <textarea name="description" id="descInput" placeholder="Describe the issue in detail — location, duration, severity..." required></textarea>
+              <div class="ai-hint" id="aiHint"><span class="ai-dot"></span> AI detected: <strong id="aiCategory">—</strong> | Priority: <strong id="aiPriority">—</strong></div>
+            </div>
+            <div class="form-group">
+              <label>Category</label>
+              <select name="category" id="categorySelect">
+                <option value="">Auto-detect (AI)</option>
+                <option>Road</option>
+                <option>Garbage</option>
+                <option>Electricity</option>
+                <option>Water</option>
+                <option>Transport</option>
+                <option>Other</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Area / Location *</label>
+              <input type="text" name="area" id="areaInput" placeholder="Enter or select location on map" required>
+              <button type="button" id="getLocationBtn" style="margin-top:0.5rem;padding:0.5rem 1rem;background:var(--teal);color:#fff;border:none;border-radius:6px;cursor:pointer;">📍 Use My Location</button>
+            </div>
+            <div class="form-group full">
+              <label>Location Map</label>
+              <div id="map" style="height:300px;border:1px solid var(--border);border-radius:8px;"></div>
+            </div>
+            <div class="form-group full">
+              <label>Upload Photo (optional)</label>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem">
+                <div class="upload-zone" id="uploadZone">
+                  <div class="upload-icon">📎</div>
+                  <div class="upload-text">Drag & drop or <strong>click to browse</strong></div>
+                  <input type="file" name="image" id="imageInput" accept="image/*" style="display:none">
+                </div>
+                <div class="upload-zone" id="cameraBtn" style="border-style:solid;display:flex;flex-direction:column;align-items:center;justify-content:center">
+                  <div class="upload-icon">📸</div>
+                  <div class="upload-text"><strong>Take Geotagged Photo</strong></div>
+                </div>
+              </div>
+              <div id="cameraContainer" style="display:none;margin-bottom:1rem;position:relative;background:#000;border-radius:12px;overflow:hidden">
+                <video id="video" width="100%" height="auto" autoplay playsinline></video>
+                <canvas id="canvas" style="display:none"></canvas>
+                <div style="position:absolute;bottom:1rem;left:0;right:0;display:flex;justify-content:center;gap:1rem">
+                  <button type="button" id="captureBtn" style="padding:0.75rem 1.5rem;background:var(--accent);color:#fff;border:none;border-radius:50px;font-weight:700;cursor:pointer">Snap Photo</button>
+                  <button type="button" id="cancelCameraBtn" style="padding:0.75rem 1.5rem;background:#fff;color:var(--ink);border:none;border-radius:50px;font-weight:700;cursor:pointer">Cancel</button>
+                </div>
+              </div>
+              <div id="imagePreview"></div>
+              <input type="hidden" name="latitude" id="latInput">
+              <input type="hidden" name="longitude" id="lngInput">
+            </div>
+          </div>
+          <div style="display:flex;justify-content:flex-end;margin-top:1.5rem">
+            <button type="submit" class="submit-btn" id="submitBtn">
+              <span id="submitText">Submit Complaint</span>
+              <span>→</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- QUICK LINKS -->
+    <div>
+      <div class="section-header">
+        <div class="section-num">02</div>
+        <div class="section-title">Quick Access</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:1rem">
+        <div id="officialQuickLinks" style="display:none;flex-direction:column;gap:1rem">
+          <a href="dashboard.html" class="quick-link-card">
+            <div class="qlc-icon">📊</div>
+            <div class="qlc-title">Complaints Dashboard</div>
+            <div class="qlc-sub">Monitor all complaints by category, area, and status with live charts and trends.</div>
+            <div class="qlc-arrow">→</div>
+          </a>
+          <a href="funds.html" class="quick-link-card">
+            <div class="qlc-icon">💰</div>
+            <div class="qlc-title">Fund & Vendor Transparency</div>
+            <div class="qlc-sub">Track government fund allocation, contractor performance, and area-wise spending.</div>
+            <div class="qlc-arrow">→</div>
+          </a>
+        </div>
+        <div id="citQL" style="display:none;flex-direction:column;gap:1rem">
+          <a href="citizen_dashboard.html" class="quick-link-card">
+            <div class="qlc-icon">📋</div>
+            <div class="qlc-title">My Complaints</div>
+            <div class="qlc-sub">View and track the status of all grievances you have submitted.</div>
+            <div class="qlc-arrow">→</div>
+          </a>
+        </div>
+        <a href="login.html" class="quick-link-card" id="loginQuickLink">
+          <div class="qlc-icon">🔒</div>
+          <div class="qlc-title">Official Login</div>
+          <div class="qlc-sub">Government officials can login here to access the dashboard and resolve complaints.</div>
+          <div class="qlc-arrow">→</div>
+        </a>
+        <a href="https://pgportal.gov.in/Home/AboutUs" target="_blank" class="quick-link-card">
+          <div class="qlc-icon">🏛️</div>
+          <div class="qlc-title">Central Grievance Portal</div>
+          <div class="qlc-sub"><marquee behavior="scroll" direction="left" scrollamount="4">Official CPGRAMS portal for specialized grievances at the central government level.</marquee></div>
+          <div class="qlc-arrow">→</div>
+        </a>
+        <a href="https://bbmp.gov.in/home" target="_blank" class="quick-link-card">
+          <div class="qlc-icon">🏙️</div>
+          <div class="qlc-title">BBMP Official Portal</div>
+          <div class="qlc-sub"><marquee behavior="scroll" direction="left" scrollamount="3">Bruhat Bengaluru Mahanagara Palike — Your direct access to city municipal services.</marquee></div>
+          <div class="qlc-arrow">→</div>
+        </a>
+        <a href="https://www.myscheme.gov.in/" target="_blank" class="quick-link-card">
+          <div class="qlc-icon">📜</div>
+          <div class="qlc-title">National Scheme Portal</div>
+          <div class="qlc-sub"><marquee behavior="scroll" direction="left" scrollamount="5">Explore government schemes and check your eligibility on the official myScheme platform.</marquee></div>
+          <div class="qlc-arrow">→</div>
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- COMPLAINTS LIST -->
+  <div class="complaints-section">
+    <div class="section-header">
+      <div class="section-num">03</div>
+      <div class="section-title">Recent Complaints</div>
+    </div>
+    <div class="filter-bar">
+      <select id="filterStatus" onchange="loadComplaints()"><option value="">All Statuses</option><option>Pending</option><option>In Progress</option><option>Resolved</option><option>Rejected</option></select>
+      <select id="filterPriority" onchange="loadComplaints()"><option value="">All Priorities</option><option>High</option><option>Medium</option><option>Low</option></select>
+      <select id="filterCategory" onchange="loadComplaints()"><option value="">All Categories</option><option>Road</option><option>Garbage</option><option>Electricity</option><option>Water</option><option>Transport</option></select>
+      <select id="filterArea" onchange="loadComplaints()"><option value="">All Areas</option><option>Whitefield</option><option>Indiranagar</option><option>Koramangala</option><option>Jayanagar</option><option>Hebbal</option><option>Electronic City</option><option>BTM Layout</option><option>Marathahalli</option></select>
+      <button class="refresh-btn" onclick="loadComplaints()">↻ Refresh</button>
+    </div>
+    <div class="complaints-grid" id="complaintsGrid">
+      <div style="grid-column:1/-1;text-align:center;padding:3rem;color:var(--muted)">Loading complaints…</div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast">
+  <div class="toast-title" id="toastTitle">Success</div>
+  <div class="toast-body" id="toastBody"></div>
+</div>
+
+<script>
+// ── Auth Handling ───────────────────────────────────────────────
+let currentUser = null;
+
+// ── Auth Handling & Protection ─────────────────────────────────────────
+async function checkAuth() {
+  try {
+    const r = await fetch('/api/me');
+    const d = await r.json();
+    if(d.user) {
+      currentUser = d.user;
+      const authLinks = document.getElementById('authLinks');
+      const logoutBtn = document.getElementById('logoutBtn');
+      const loginBtn = document.getElementById('loginBtn');
+      const offQL = document.getElementById('officialQuickLinks');
+      const citQL = document.getElementById('citQL');
+      const logQL = document.getElementById('loginQuickLink');
+      
+      loginBtn.style.display = 'none';
+      logoutBtn.style.display = 'inline-block';
+      logoutBtn.href = '/logout';
+      logoutBtn.textContent = 'Logout (' + currentUser.username + ')';
+      if(logQL) logQL.style.display = 'none';
+      
+      if(authLinks) authLinks.style.display = 'inline-block';
+
+      if(currentUser.role === 'official' || currentUser.role === 'admin') {
+        document.getElementById('navDashboard').style.display = 'inline-block';
+        document.getElementById('navFunds').style.display = 'inline-block';
+        if(offQL) offQL.style.display = 'flex';
+      } else if(currentUser.role === 'citizen') {
+        document.getElementById('navCitizen').style.display = 'inline-block';
+        if(citQL) citQL.style.display = 'flex';
+        
+        // Auto-fill citizen info
+        const nameField = document.querySelector('input[name="citizen_name"]');
+        const contactField = document.querySelector('input[name="citizen_contact"]');
+        if(contactField) { 
+          contactField.value = currentUser.username; 
+          contactField.readOnly = true;
+          contactField.title = "Contact number is tied to your account";
+        }
+        if(nameField && currentUser.display_name) { nameField.value = currentUser.display_name; }
+      }
+    }
+  } catch(e) {
+    // console.error("Failed to fetch user data:", e);
+  }
+}
+
+function logout(e) {
+  if(e) e.preventDefault();
+  window.location.href = '/logout';
+}
+
+checkAuth();
+
+// ── Real-Time Socket Connection ─────────────────────────────────
+const socket = io();
+
+// ── AI Auto-categorize (WebSocket) ─────────────────────────────
+let aiTimer;
+const titleInput = document.getElementById('titleInput');
+const descInput = document.getElementById('descInput');
+const aiHint = document.getElementById('aiHint');
+const aiCategory = document.getElementById('aiCategory');
+const catSelect = document.getElementById('categorySelect');
+
+function emitLiveCategorize(){
+  clearTimeout(aiTimer);
+  const title = titleInput.value.trim();
+  const desc = descInput.value.trim();
+  if(title.length < 3) {
+    aiHint.classList.remove('show');
+    return;
+  }
+  
+  aiTimer = setTimeout(() => {
+    socket.emit('live_categorize', { title, description: desc });
+  }, 400);
+}
+
+titleInput.addEventListener('input', emitLiveCategorize);
+descInput.addEventListener('input', emitLiveCategorize);
+
+socket.on('categorization_update', (data) => {
+    if (data.category) {
+        aiCategory.textContent = data.category;
+        document.getElementById('aiPriority').textContent = data.priority || 'Medium';
+        aiHint.classList.add('show');
+        
+        // Auto-select category if not manually picked
+        if(!catSelect.value || catSelect.value === "") {
+            catSelect.value = data.category === 'Other' ? "" : data.category;
+        }
+    }
+});
+
+// ── Upload Zone ─────────────────────────────────────────────────
+const uploadZone = document.getElementById('uploadZone');
+const imageInput = document.getElementById('imageInput');
+const imagePreview = document.getElementById('imagePreview');
+
+uploadZone.addEventListener('click', ()=> imageInput.click());
+uploadZone.addEventListener('dragover', e=>{e.preventDefault();uploadZone.classList.add('dragover')});
+uploadZone.addEventListener('dragleave', ()=> uploadZone.classList.remove('dragover'));
+uploadZone.addEventListener('drop', e=>{
+  e.preventDefault(); uploadZone.classList.remove('dragover');
+  if(e.dataTransfer.files[0]) showPreview(e.dataTransfer.files[0]);
+});
+imageInput.addEventListener('change', ()=>{if(imageInput.files[0]) showPreview(imageInput.files[0])});
+
+// ── Camera & Geotagging Logic ────────────────────────────────────
+const cameraBtn = document.getElementById('cameraBtn');
+const cameraContainer = document.getElementById('cameraContainer');
+const video = document.getElementById('video');
+const canvas = document.getElementById('canvas');
+const captureBtn = document.getElementById('captureBtn');
+const cancelCameraBtn = document.getElementById('cancelCameraBtn');
+const latInput = document.getElementById('latInput');
+const lngInput = document.getElementById('lngInput');
+
+let stream = null;
+
+cameraBtn.addEventListener('click', async () => {
+    try {
+        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+        video.srcObject = stream;
+        cameraContainer.style.display = 'block';
+        uploadZone.parentElement.style.display = 'none';
+        
+        // Start getting location immediately for better response time
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(position => {
+                latInput.value = position.coords.latitude;
+                lngInput.value = position.coords.longitude;
+                updateLocationFromCoords(position.coords.latitude, position.coords.longitude);
+            }, err => {
+                console.warn("Location error:", err);
+            }, { enableHighAccuracy: true });
+        }
+    } catch (err) {
+        showToast('❌ Camera Error', 'Please grant camera permissions to use this feature.');
+    }
+});
+
+function stopCamera() {
+    if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+        stream = null;
+    }
+    cameraContainer.style.display = 'none';
+    uploadZone.parentElement.style.display = 'grid';
+}
+
+cancelCameraBtn.addEventListener('click', stopCamera);
+
+captureBtn.addEventListener('click', () => {
+    const context = canvas.getContext('2d');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+    
+    canvas.toBlob(blob => {
+        const file = new File([blob], "captured_photo.jpg", { type: "image/jpeg" });
+        const dataTransfer = new DataTransfer();
+        dataTransfer.items.add(file);
+        imageInput.files = dataTransfer.files;
+        showPreview(file);
+        stopCamera();
+        
+        // Ensure location is captured
+        if (!latInput.value && navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(position => {
+                latInput.value = position.coords.latitude;
+                lngInput.value = position.coords.longitude;
+                updateLocationFromCoords(position.coords.latitude, position.coords.longitude);
+            });
+        }
+        
+        showToast('📸 Photo Captured', 'Location geotagged successfully.');
+    }, 'image/jpeg', 0.8);
+});
+
+async function updateLocationFromCoords(lat, lon) {
+    map.setView([lat, lon], 15);
+    if(marker) map.removeLayer(marker);
+    marker = L.marker([lat, lon]).addTo(map);
+    
+    try{
+        const r = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`);
+        const d = await r.json();
+        const address = d.display_name || `${lat.toFixed(4)}, ${lon.toFixed(4)}`;
+        document.getElementById('areaInput').value = address;
+    }catch(err){
+        document.getElementById('areaInput').value = `${lat.toFixed(4)}, ${lon.toFixed(4)}`;
+    }
+}
+
+function showPreview(file){
+  const reader = new FileReader();
+  reader.onload = e=>{
+    let locText = "";
+    if (latInput.value) {
+        locText = `<div style="font-size:0.75rem;color:var(--teal);margin-top:0.5rem;font-weight:600">📍 Location: ${latInput.value}, ${lngInput.value}</div>`;
+    }
+    imagePreview.innerHTML = `<img src="${e.target.result}" alt="Preview">${locText}`;
+    imagePreview.style.display = 'block';
+  };
+  reader.readAsDataURL(file);
+}
+
+// ── Form Submit ─────────────────────────────────────────────────
+document.getElementById('complaintForm').addEventListener('submit', async e=>{
+  e.preventDefault();
+  const btn = document.getElementById('submitBtn');
+  const txt = document.getElementById('submitText');
+  btn.disabled = true;
+  txt.innerHTML = '<span class="spinner"></span> Submitting…';
+  
+  const fd = new FormData(e.target);
+  try{
+    const r = await fetch('/api/complaints',{method:'POST',body:fd});
+    const d = await r.json();
+    if(d.success){
+      showToast('✅ Complaint Submitted!', d.message + ` Category: ${d.category}`);
+      e.target.reset();
+      imagePreview.style.display='none';
+      aiHint.classList.remove('show');
+      loadComplaints();
+      loadStats();
+    } else {
+      showToast('❌ Error', d.error || 'Submission failed');
+    }
+  }catch(err){
+    showToast('❌ Error', 'Server not reachable. Make sure Flask is running.');
+  }
+  btn.disabled = false;
+  txt.textContent = 'Submit Complaint';
+});
+
+// ── Load Stats ──────────────────────────────────────────────────
+async function loadStats(){
+  try{
+    const r = await fetch('/api/complaints/stats');
+    const d = await r.json();
+    document.getElementById('statTotal').textContent = d.total || 0;
+    document.getElementById('statPending').textContent = d.pending || 0;
+    document.getElementById('statResolved').textContent = d.resolved || 0;
+    document.getElementById('statProgress').textContent = d.in_progress || 0;
+  }catch(e){}
+}
+
+// ── Load Complaints ─────────────────────────────────────────────
+async function loadComplaints(){
+  const status = document.getElementById('filterStatus').value;
+  const category = document.getElementById('filterCategory').value;
+  const area = document.getElementById('filterArea').value;
+  const priority = document.getElementById('filterPriority').value;
+  
+  let url = '/api/complaints?';
+  if(status) url += `status=${status}&`;
+  if(category) url += `category=${category}&`;
+  if(priority) url += `priority=${priority}&`;
+  if(area) url += `area=${area}&`;
+  
+  const grid = document.getElementById('complaintsGrid');
+  grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:3rem;color:var(--muted)">Loading…</div>';
+  
+  try{
+    const r = await fetch(url);
+    const complaints = await r.json();
+    if(!complaints.length){
+      grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:3rem;color:var(--muted)">No complaints found.</div>';
+      return;
+    }
+    grid.innerHTML = complaints.map(c=>`
+      <div class="complaint-card ${c.status.replace(' ', '-')}">
+        <div class="card-head">
+          <div class="card-title">${escHtml(c.title)}</div>
+          <div class="card-id">#${c.id}</div>
+        </div>
+        <div class="card-desc">${escHtml(c.description||'')}</div>
+        <div class="card-meta">
+          <span class="tag tag-cat">${c.category}</span>
+          <span class="tag tag-pri-${c.priority || 'Medium'}">${c.priority || 'Medium'}</span>
+          <span class="tag tag-area">📍 ${c.area}</span>
+          <span class="tag tag-status-${c.status.replace(' ', '-')}">${c.status}</span>
+        </div>
+        <div class="card-footer">
+          <span class="card-citizen">👤 ${escHtml(c.citizen_name||'Anonymous')}</span>
+          <span>${formatDate(c.created_at)}</span>
+        </div>
+      </div>
+    `).join('');
+  }catch(e){
+    grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:3rem;color:var(--danger)">Failed to load. Start Flask server first.</div>';
+  }
+}
+
+// ── Setup DB ────────────────────────────────────────────────────
+async function setupDatabase(){
+  const title = document.getElementById('setupTitle');
+  const arrow = document.getElementById('setupArrow');
+  title.textContent = 'Setting up…';
+  arrow.textContent = '⏳';
+  try{
+    const r = await fetch('/api/setup',{method:'POST'});
+    const d = await r.json();
+    if(d.success){
+      showToast('🗄️ Database Ready!', d.message);
+      title.textContent = '✅ Database Initialized';
+      arrow.textContent = '✓';
+      loadStats(); loadComplaints();
+    } else {
+      showToast('❌ Setup Failed', d.error);
+      title.textContent = 'Setup Database'; arrow.textContent = '→';
+    }
+  }catch(e){
+    showToast('❌ Error', 'Flask server not running.');
+    title.textContent = 'Setup Database'; arrow.textContent = '→';
+  }
+}
+
+// ── Helpers ─────────────────────────────────────────────────────
+function showToast(title, body){
+  const t = document.getElementById('toast');
+  document.getElementById('toastTitle').textContent = title;
+  document.getElementById('toastBody').textContent = body;
+  t.classList.add('show');
+  setTimeout(()=> t.classList.remove('show'), 5000);
+}
+
+function escHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') }
+function formatDate(d){ if(!d) return ''; return new Date(d).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}) }
+
+// ── Map Initialization ──────────────────────────────────────────
+let map, marker;
+function initMap(){
+  map = L.map('map').setView([12.9716, 77.5946], 10); // Bangalore center
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap contributors'
+  }).addTo(map);
+  
+  map.on('click', async function(e) {
+    const {lat, lng} = e.latlng;
+    if(marker) map.removeLayer(marker);
+    marker = L.marker([lat, lng]).addTo(map);
+    
+    // Reverse geocoding using Nominatim
+    try{
+      const r = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`);
+      const d = await r.json();
+      const address = d.display_name || `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+      document.getElementById('areaInput').value = address;
+    }catch(err){
+      document.getElementById('areaInput').value = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+    }
+  });
+}
+
+document.getElementById('getLocationBtn').addEventListener('click', function(){
+  if(navigator.geolocation){
+    navigator.geolocation.getCurrentPosition(async function(pos){
+      const {latitude, longitude} = pos.coords;
+      map.setView([latitude, longitude], 15);
+      if(marker) map.removeLayer(marker);
+      marker = L.marker([latitude, longitude]).addTo(map);
+      
+      try{
+        const r = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`);
+        const d = await r.json();
+        const address = d.display_name || `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`;
+        document.getElementById('areaInput').value = address;
+      }catch(err){
+        document.getElementById('areaInput').value = `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`;
+      }
+    }, function(err){
+      showToast('❌ Location Error', 'Unable to get your location.');
+    });
+  }else{
+    showToast('❌ Geolocation not supported', 'Your browser does not support geolocation.');
+  }
+});
+
+initMap();
+loadStats(); loadComplaints();
+</script>
+</body>
+</html>

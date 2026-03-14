@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GRIP — Complaints Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --ink:#0A0A14;--paper:#F4F1EB;--accent:#E63946;--gold:#F4A261;--teal:#2A9D8F;
+  --blue:#264653;--muted:#6B6B7A;--card:#FFFDF7;--border:#DDD9D0;
+}
+body{font-family:'DM Sans',sans-serif;background:var(--paper);color:var(--ink);min-height:100vh}
+nav{position:fixed;top:0;left:0;right:0;z-index:100;background:var(--ink);padding:0 2.5rem;height:60px;display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid var(--accent)}
+.nav-logo{font-family:'Syne',sans-serif;font-weight:800;font-size:1.3rem;color:#fff}
+.nav-logo span{color:var(--accent)}
+.nav-links{display:flex;gap:0.25rem}
+.nav-links a{color:#ccc;text-decoration:none;font-size:0.85rem;font-weight:500;padding:0.4rem 0.9rem;border-radius:4px;transition:all 0.2s;letter-spacing:0.03em}
+.nav-links a:hover,.nav-links a.active{background:var(--accent);color:#fff}
+
+.page-header{margin-top:60px;background:var(--ink);padding:2.5rem 2.5rem 2rem;border-bottom:1px solid #ffffff15}
+.page-header h1{font-family:'Syne',sans-serif;font-size:2rem;font-weight:800;color:#fff;letter-spacing:-0.02em}
+.page-header p{color:#888;margin-top:0.5rem;font-size:0.9rem}
+
+.main-wrap{max-width:1400px;margin:0 auto;padding:2.5rem}
+
+.kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:1.25rem;margin-bottom:2.5rem}
+.kpi{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:1.5rem;position:relative;overflow:hidden;transition:transform 0.2s}
+.kpi:hover{transform:translateY(-2px)}
+.kpi::before{content:'';position:absolute;top:0;left:0;right:0;height:3px}
+.kpi.total::before{background:var(--ink)}
+.kpi.pending::before{background:var(--gold)}
+.kpi.resolved::before{background:var(--teal)}
+.kpi.progress::before{background:#4361EE}
+.kpi-icon{font-size:1.5rem;margin-bottom:0.75rem}
+.kpi-val{font-family:'Syne',sans-serif;font-size:2.5rem;font-weight:800;line-height:1}
+.kpi-label{font-size:0.78rem;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted);margin-top:0.4rem}
+.kpi-pct{font-size:0.78rem;color:var(--teal);margin-top:0.25rem}
+
+.charts-grid{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;margin-bottom:2.5rem}
+.chart-card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:1.75rem}
+.chart-title{font-family:'Syne',sans-serif;font-size:1rem;font-weight:700;margin-bottom:1.5rem;letter-spacing:-0.01em;display:flex;align-items:center;gap:0.5rem}
+.chart-title .dot{width:8px;height:8px;border-radius:50%;background:var(--accent)}
+.chart-wrap{position:relative;height:260px}
+
+.full-width{grid-column:1/-1}
+
+/* TABLE */
+.table-card{background:var(--card);border:1px solid var(--border);border-radius:16px;overflow:hidden;margin-bottom:2rem}
+.table-card.high-alert{border:2px solid var(--accent);box-shadow:0 4px 24px #E6394618}
+.table-card.high-alert .table-header{background:linear-gradient(135deg,#2a0a0e,#1a0508);border-bottom:1px solid #E6394640}
+.table-card.high-alert .table-header h3{color:#fff}
+.table-card.high-alert .alert-badge{display:inline-flex;align-items:center;gap:0.4rem;background:#E63946;color:#fff;font-size:0.7rem;font-weight:700;padding:0.3rem 0.7rem;border-radius:100px;letter-spacing:0.06em;text-transform:uppercase;animation:pulse-alert 2s ease-in-out infinite}
+@keyframes pulse-alert{0%,100%{opacity:1}50%{opacity:0.7}}
+.table-header{padding:1.5rem 1.75rem;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border)}
+.table-header h3{font-family:'Syne',sans-serif;font-size:1rem;font-weight:700}
+.table-filters{display:flex;gap:0.75rem;align-items:center}
+.table-filters select{padding:0.45rem 0.9rem;border:1.5px solid var(--border);border-radius:6px;font-size:0.82rem;font-family:'DM Sans',sans-serif;background:var(--paper);color:var(--ink);outline:none;cursor:pointer}
+.tbl{width:100%;border-collapse:collapse}
+.tbl th{background:var(--paper);padding:0.8rem 1.25rem;text-align:left;font-size:0.72rem;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border)}
+.tbl td{padding:0.9rem 1.25rem;font-size:0.85rem;border-bottom:1px solid var(--border)}
+.tbl tr:last-child td{border-bottom:none}
+.tbl tr:hover td{background:#00000004}
+.tag{padding:0.25rem 0.65rem;border-radius:100px;font-size:0.7rem;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;display:inline-block}
+.tag-Pending{background:#F4A26115;color:#E07020}
+.tag-Resolved{background:#2A9D8F15;color:var(--teal)}
+.tag-In\ Progress,.tag-In_Progress{background:#4361EE15;color:#4361EE}
+.tag-Rejected{background:#6B6B7A15;color:var(--muted)}
+.tag-pri-High{background:#E6394615;color:var(--accent)}
+.tag-pri-Medium{background:#F4A26115;color:#E07020}
+.tag-pri-Low{background:#2A9D8F15;color:var(--teal)}
+.tag-cat{background:#E6394610;color:var(--accent)}
+.tag-area{background:#2A9D8F10;color:var(--teal)}
+
+.status-select{padding:0.3rem 0.6rem;border:1.5px solid var(--border);border-radius:6px;font-size:0.78rem;font-family:'DM Sans',sans-serif;background:var(--paper);cursor:pointer;outline:none}
+.status-select:focus{border-color:var(--accent)}
+
+.pagination{display:flex;gap:0.5rem;padding:1rem 1.75rem;border-top:1px solid var(--border);align-items:center}
+.pagination button{padding:0.45rem 0.9rem;border:1px solid var(--border);background:var(--card);border-radius:6px;font-size:0.82rem;cursor:pointer;transition:all 0.15s}
+.pagination button:hover{background:var(--accent);color:#fff;border-color:var(--accent)}
+.pagination button.active{background:var(--ink);color:#fff;border-color:var(--ink)}
+.page-info{font-size:0.82rem;color:var(--muted);margin-left:auto}
+
+@media(max-width:768px){.kpi-row{grid-template-columns:1fr 1fr}.charts-grid{grid-template-columns:1fr}.main-wrap{padding:1.5rem}nav{padding:0 1.5rem}}
+
+/* MODALS */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:200;display:none;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
+.modal-overlay.active{display:flex}
+.modal-box{background:var(--card);border-radius:16px;max-width:560px;width:90%;max-height:85vh;overflow-y:auto;padding:2rem;position:relative;box-shadow:0 20px 60px #00000040}
+.modal-close{position:absolute;top:1rem;right:1rem;background:none;border:none;font-size:1.5rem;cursor:pointer;color:var(--muted);transition:color 0.2s}
+.modal-close:hover{color:var(--accent)}
+.modal-title{font-family:'Syne',sans-serif;font-size:1.2rem;font-weight:700;margin-bottom:1.5rem}
+.timeline{position:relative;padding-left:2rem}
+.timeline::before{content:'';position:absolute;left:0.5rem;top:0;bottom:0;width:2px;background:var(--border)}
+.tl-item{position:relative;margin-bottom:1.5rem;padding-left:1rem}
+.tl-item::before{content:'';position:absolute;left:-1.55rem;top:0.35rem;width:10px;height:10px;border-radius:50%;background:var(--accent);border:2px solid var(--card)}
+.tl-item.first::before{background:var(--teal)}
+.tl-status{font-weight:600;font-size:0.9rem}
+.tl-meta{font-size:0.78rem;color:var(--muted);margin-top:0.2rem}
+.lightbox-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:250;display:none;align-items:center;justify-content:center;cursor:zoom-out}
+.lightbox-overlay.active{display:flex}
+.lightbox-overlay img{max-width:90%;max-height:90%;border-radius:12px;box-shadow:0 10px 40px #00000060}
+.photo-thumb{width:28px;height:28px;border-radius:6px;object-fit:cover;cursor:pointer;border:1px solid var(--border);transition:transform 0.2s}
+.photo-thumb:hover{transform:scale(1.3)}
+.stars{color:#F4A261;font-size:0.9rem;letter-spacing:1px}
+.btn{padding:0.6rem 1.2rem;background:var(--ink);color:#fff;border:none;border-radius:8px;font-weight:600;font-size:0.85rem;cursor:pointer;transition:background 0.2s;text-decoration:none;display:inline-block}
+.btn:hover{background:var(--accent)}
+.btn-outline{background:transparent;color:var(--ink);border:1.5px solid var(--border)}
+.btn-outline:hover{background:var(--ink);color:#fff;border-color:var(--ink)}
+.page-header .btn-outline{color:#fff;border-color:#ffffff40}
+.page-header .btn-outline:hover{background:#fff;color:var(--ink);border-color:#fff}
+
+.admin-panel{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:2rem;margin-bottom:2.5rem;display:none}
+.admin-panel h2{font-family:'Syne',sans-serif;font-size:1.3rem;font-weight:700;margin-bottom:1.5rem}
+.form-row{display:flex;gap:1rem;margin-bottom:1.5rem}
+.form-row input, .form-row select{flex:1;padding:0.75rem 1rem;border:1.5px solid var(--border);border-radius:8px;font-family:inherit;font-size:0.9rem}
+
+.audit-table{width:100%;border-collapse:collapse;font-size:0.85rem}
+.audit-table th,.audit-table td{padding:0.75rem;text-align:left;border-bottom:1px solid var(--border)}
+.audit-table th{color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:0.05em;font-size:0.75rem}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-logo">GR<span>IP</span></div>
+  <div class="nav-links">
+    <a href="index.html">Submit Complaint</a>
+    <span id="authLinks" style="display:none">
+      <a href="dashboard.html" class="active">Dashboard</a>
+      <a href="funds.html">Fund Transparency</a>
+    </span>
+    <a href="#" id="logoutBtn" style="display:none" onclick="logout(event)">Logout</a>
+    <a href="login.html" id="loginBtn">Login</a>
+  </div>
+</nav>
+
+<div class="page-header">
+  <div style="max-width:1400px;margin:0 auto;display:flex;justify-content:space-between;align-items:flex-end">
+    <div>
+      <h1>📊 Complaints Intelligence Dashboard</h1>
+      <p>Real-time monitoring of civic complaints — category breakdown, area heatmap, and resolution trends</p>
+    </div>
+    <div id="adminActions" style="display:none;gap:1rem">
+      <button class="btn btn-outline" onclick="openAudit()">View Audit Logs</button>
+      <a href="/api/export_complaints" class="btn" target="_blank">📥 Export CSV</a>
+    </div>
+  </div>
+</div>
+
+<div class="main-wrap">
+  <!-- ROLE MANAGEMENT PANEL (Admin Only) -->
+  <div class="admin-panel" id="adminPanel">
+    <h2>👥 Role & Staff Management</h2>
+    <div style="background:#f8f9fa;padding:1.5rem;border-radius:12px;margin-bottom:1.5rem">
+      <h3 style="font-size:0.95rem;margin-bottom:1rem">Add New Official</h3>
+      <div class="form-row">
+        <input type="text" id="offUser" placeholder="Username">
+        <input type="password" id="offPass" placeholder="Password">
+        <select id="offArea">
+          <option value="">All Areas</option>
+          <option>Whitefield</option><option>Indiranagar</option><option>Koramangala</option><option>Jayanagar</option><option>Hebbal</option><option>Electronic City</option><option>BTM Layout</option><option>Marathahalli</option>
+        </select>
+        <select id="offCat">
+          <option value="">All Categories</option>
+          <option>Road</option><option>Garbage</option><option>Electricity</option><option>Water</option><option>Transport</option>
+        </select>
+        <button class="btn" onclick="addOfficial()">+ Add Official</button>
+      </div>
+    </div>
+    <div style="overflow-x:auto">
+      <table class="audit-table">
+        <thead><tr><th>ID</th><th>Username</th><th>Assigned Area</th><th>Assigned Category</th><th>Action</th></tr></thead>
+        <tbody id="officialsBody"><tr><td colspan="5" style="text-align:center;color:var(--muted)">Loading...</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+  <!-- KPIs -->
+  <div class="kpi-row">
+    <div class="kpi total"><div class="kpi-icon">📋</div><div class="kpi-val" id="kTotal">—</div><div class="kpi-label">Total Complaints</div></div>
+    <div class="kpi pending"><div class="kpi-icon">⏳</div><div class="kpi-val" id="kPending" style="color:var(--gold)">—</div><div class="kpi-label">Pending</div><div class="kpi-pct" id="kPendingPct"></div></div>
+    <div class="kpi resolved"><div class="kpi-icon">✅</div><div class="kpi-val" id="kResolved" style="color:var(--teal)">—</div><div class="kpi-label">Resolved</div><div class="kpi-pct" id="kResolvedPct"></div></div>
+    <div class="kpi progress"><div class="kpi-icon">🔧</div><div class="kpi-val" id="kProgress" style="color:#4361EE">—</div><div class="kpi-label">In Progress</div></div>
+  </div>
+
+  <!-- CHARTS -->
+  <div class="charts-grid">
+    <div class="chart-card">
+      <div class="chart-title"><span class="dot"></span>Complaints by Category</div>
+      <div class="chart-wrap"><canvas id="categoryChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title"><span class="dot" style="background:var(--teal)"></span>Resolution Status</div>
+      <div class="chart-wrap"><canvas id="statusChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title"><span class="dot" style="background:var(--gold)"></span>Complaints by Area (Top 8)</div>
+      <div class="chart-wrap"><canvas id="areaChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title"><span class="dot" style="background:#4361EE"></span>Monthly Complaint Trend</div>
+      <div class="chart-wrap"><canvas id="trendChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title"><span class="dot" style="background:var(--accent)"></span>Complaint Density Heatmap</div>
+      <div class="chart-wrap" style="position:relative"><div id="map" style="width:100%;height:100%;border-radius:12px;z-index:1"></div></div>
+    </div>
+  </div>
+
+  <!-- HIGH ALERT SECTION -->
+  <div class="table-card high-alert">
+    <div class="table-header">
+      <h3>🚨 High Alert Complaints <span class="alert-badge" id="alertCount">0 URGENT</span></h3>
+    </div>
+    <div style="overflow-x:auto">
+      <table class="tbl">
+        <thead><tr>
+          <th>#ID</th><th>Title</th><th>Category</th><th>Area</th><th>Citizen</th><th>Status</th><th>Submitted</th><th>Action</th>
+        </tr></thead>
+        <tbody id="alertBody"><tr><td colspan="8" style="text-align:center;padding:2rem;color:var(--muted)">Loading…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ACTIVE CASES TABLE -->
+  <div class="table-card">
+    <div class="table-header">
+      <h3>⏳ Active Cases</h3>
+      <div class="table-filters">
+        <select id="tPriority" onchange="loadTable()"><option value="">All Priorities</option><option>High</option><option>Medium</option><option>Low</option></select>
+        <select id="tCategory" onchange="loadTable()"><option value="">All Category</option><option>Road</option><option>Garbage</option><option>Electricity</option><option>Water</option><option>Transport</option></select>
+        <select id="tArea" onchange="loadTable()"><option value="">All Areas</option><option>Whitefield</option><option>Indiranagar</option><option>Koramangala</option><option>Jayanagar</option><option>Hebbal</option><option>Electronic City</option><option>BTM Layout</option><option>Marathahalli</option></select>
+      </div>
+    </div>
+    <div style="overflow-x:auto">
+      <table class="tbl">
+        <thead><tr>
+          <th>#ID</th><th>Title</th><th>Sentiment</th><th>Category</th><th>Priority</th><th>Area</th><th>Citizen</th><th>Status</th><th>Open For</th><th>Updated By</th><th>Action</th>
+        </tr></thead>
+        <tbody id="activeBody"><tr><td colspan="11" style="text-align:center;padding:2rem;color:var(--muted)">Loading…</td></tr></tbody>
+      </table>
+    </div>
+    <div class="pagination" id="activePagination"></div>
+  </div>
+
+  <!-- RESOLVED CASES TABLE -->
+  <div class="table-card" style="margin-top:2rem">
+    <div class="table-header">
+      <h3>✅ Resolved Cases</h3>
+    </div>
+    <div style="overflow-x:auto">
+      <table class="tbl">
+        <thead><tr>
+          <th>#ID</th><th>Title</th><th>Category</th><th>Priority</th><th>Area</th><th>Citizen</th><th>Updated By</th><th>Submitted</th><th>Resolved On</th><th>Rating</th>
+        </tr></thead>
+        <tbody id="resolvedBody"><tr><td colspan="10" style="text-align:center;padding:2rem;color:var(--muted)">Loading…</td></tr></tbody>
+      </table>
+    </div>
+    <div class="pagination" id="resolvedPagination"></div>
+  </div>
+</div>
+
+<!-- TIMELINE MODAL -->
+<div class="modal-overlay" id="timelineModal" onclick="if(event.target===this)closeTimeline()">
+  <div class="modal-box">
+    <button class="modal-close" onclick="closeTimeline()">&times;</button>
+    <div class="modal-title" id="timelineTitle">Complaint Timeline</div>
+    <div id="timelineContent"><p style="color:var(--muted)">Loading…</p></div>
+  </div>
+</div>
+
+<!-- LIGHTBOX -->
+<div class="lightbox-overlay" id="lightbox" onclick="closeLightbox()">
+  <img id="lightboxImg" src="" alt="Evidence Photo">
+</div>
+
+<!-- AUDIT LOG MODAL -->
+<div class="modal-overlay" id="auditModal" onclick="if(event.target===this)closeAudit()">
+  <div class="modal-box" style="max-width:800px">
+    <button class="modal-close" onclick="closeAudit()">&times;</button>
+    <div class="modal-title">System Audit Logs</div>
+    <p style="color:var(--muted);margin-bottom:1.5rem;font-size:0.9rem">Showing the 50 most recent auditable actions across the platform.</p>
+    <div style="max-height:60vh;overflow-y:auto;border:1px solid var(--border);border-radius:8px">
+      <table class="audit-table">
+        <thead style="position:sticky;top:0;background:var(--card);">
+          <tr><th>Time</th><th>User</th><th>Action Code</th><th>Details</th></tr>
+        </thead>
+        <tbody id="auditBody"><tr><td colspan="4" style="text-align:center;padding:2rem">Loading...</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+let currentUser = null;
+// ── Data Loading & Charts ────────────────────────────────────────────
+const COLORS = ['#4361EE','#F4A261','#2A9D8F','#E76F51','#F4A261','#4361EE'];
+const CHART_OPTS = { responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}} };
+let charts = {};
+
+let map;
+let mapMarkers = [];
+const AREA_COORDS = { 'Whitefield': [12.9698, 77.7499], 'Indiranagar': [12.9784, 77.6408], 'Koramangala': [12.9352, 77.6245], 'Jayanagar': [12.9299, 77.5834], 'Hebbal': [13.0354, 77.5988], 'Electronic City': [12.8452, 77.6602], 'BTM Layout': [12.9166, 77.6101], 'Marathahalli': [12.9569, 77.7011], 'MG Road': [12.9724, 77.6016] };
+
+function initMap() {
+  if(!map) {
+    map = L.map('map').setView([12.9716, 77.5946], 11);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { attribution: '&copy; OpenStreetMap' }).addTo(map);
+  }
+}
+
+function updateHeatmap(areaData) {
+  initMap();
+  mapMarkers.forEach(m => map.removeLayer(m));
+  mapMarkers = [];
+  areaData.forEach(item => {
+    const coords = AREA_COORDS[item.area];
+    if(coords) {
+      const radius = Math.max(12, Math.min(35, item.count * 4));
+      const color = item.count > 4 ? '#E63946' : '#F4A261';
+      const marker = L.circleMarker(coords, { radius, fillColor: color, color: '#fff', weight: 2, opacity: 1, fillOpacity: 0.75 }).addTo(map);
+      marker.bindPopup(`<strong>${item.area}</strong><br>${item.count} open complaints`);
+      mapMarkers.push(marker);
+    }
+  });
+}
+
+async function loadStats(){
+  try{
+    const r = await fetch('/api/complaints/stats');
+    const d = await r.json();
+    const total = d.total || 0;
+    document.getElementById('kTotal').textContent = total;
+    document.getElementById('kPending').textContent = d.pending || 0;
+    document.getElementById('kResolved').textContent = d.resolved || 0;
+    document.getElementById('kProgress').textContent = d.in_progress || 0;
+    if(total){
+      document.getElementById('kPendingPct').textContent = Math.round((d.pending/total)*100)+'% of total';
+      document.getElementById('kResolvedPct').textContent = Math.round((d.resolved/total)*100)+'% resolved';
+    }
+
+    destroyChart('cat');
+    const catCtx = document.getElementById('categoryChart').getContext('2d');
+    charts['cat'] = new Chart(catCtx, {
+      type:'bar',
+      data:{ labels: d.by_category.map(c=>c.category), datasets:[{data: d.by_category.map(c=>c.count), backgroundColor: COLORS, borderRadius:6, borderSkipped:false}] },
+      options:{...CHART_OPTS, plugins:{...CHART_OPTS.plugins, tooltip:{callbacks:{label:c=>`${c.raw} complaints`}}},
+        scales:{y:{beginAtZero:true,grid:{color:'#00000008'},ticks:{font:{size:11}}},x:{grid:{display:false},ticks:{font:{size:11}}}}}
+    });
+
+    destroyChart('status');
+    const stCtx = document.getElementById('statusChart').getContext('2d');
+    charts['status'] = new Chart(stCtx, {
+      type:'doughnut',
+      data:{ labels:['Pending','In Progress','Resolved'], datasets:[{data:[d.pending||0, d.in_progress||0, d.resolved||0], backgroundColor:['#F4A261','#4361EE','#2A9D8F'], borderWidth:0, hoverOffset:8}] },
+      options:{responsive:true, maintainAspectRatio:false, cutout:'65%', plugins:{legend:{display:true, position:'bottom', labels:{font:{size:12},padding:16}}}}
+    });
+
+    destroyChart('area');
+    const arCtx = document.getElementById('areaChart').getContext('2d');
+    charts['area'] = new Chart(arCtx, {
+      type:'bar',
+      data:{ labels: d.by_area.map(a=>a.area), datasets:[{data: d.by_area.map(a=>a.count), backgroundColor:'#F4A261', borderRadius:6, borderSkipped:false}] },
+      options:{...CHART_OPTS, indexAxis:'y', scales:{x:{beginAtZero:true,grid:{color:'#00000008'}},y:{grid:{display:false},ticks:{font:{size:11}}}}}
+    });
+
+    destroyChart('trend');
+    const trCtx = document.getElementById('trendChart').getContext('2d');
+    const months = [...d.monthly].reverse();
+    charts['trend'] = new Chart(trCtx, {
+      type:'line',
+      data:{ labels: months.map(m=>m.month), datasets:[{data: months.map(m=>m.count), borderColor:'#4361EE', backgroundColor:'#4361EE15', tension:0.4, fill:true, pointBackgroundColor:'#4361EE', pointRadius:4, borderWidth:2.5}] },
+      options:{...CHART_OPTS, scales:{y:{beginAtZero:true,grid:{color:'#00000008'}},x:{grid:{display:false},ticks:{font:{size:11}}}}}
+    });
+
+    updateHeatmap(d.by_area);
+  }catch(e){ console.error(e) }
+}
+
+// ── Auth ─────────────────────────────────────────────────────────────
+async function checkAuth() {
+  try {
+    const r = await fetch('/api/me');
+    const d = await r.json();
+    if(!d.user || (d.user.role !== 'official' && d.user.role !== 'admin')) {
+      window.location.href = '/login.html';
+      return;
+    }
+    currentUser = d.user;
+    
+    document.getElementById('authLinks').style.display = 'inline-block';
+    document.getElementById('loginBtn').style.display = 'none';
+    const lOut = document.getElementById('logoutBtn');
+    lOut.style.display = 'inline-block';
+    lOut.href = '/logout';
+    lOut.textContent = 'Logout (' + currentUser.username + ')';
+    
+    if(currentUser.role === 'admin') {
+      document.getElementById('adminActions').style.display = 'flex';
+      document.getElementById('adminPanel').style.display = 'block';
+      loadOfficials();
+    }
+    // Now load data
+    loadStats();
+    loadTable();
+  } catch(e){ window.location.href = '/login.html'; }
+}
+
+function logout(e) { } // Handled by standard a href now
+
+// ── Admin Functions ──────────────────────────────────────────────────
+async function loadOfficials(){
+  try{
+    const r = await fetch('/api/officials');
+    const d = await r.json();
+    document.getElementById('officialsBody').innerHTML = d.map(o=>`
+      <tr>
+        <td>#${o.id}</td><td><strong>${o.username}</strong></td>
+        <td><span class="tag tag-area">${o.assigned_area||'All'}</span></td>
+        <td><span class="tag tag-cat">${o.assigned_category||'All'}</span></td>
+        <td><button class="btn-outline" style="padding:0.2rem 0.6rem;font-size:0.75rem;border-radius:4px" onclick="delOfficial(${o.id})">Remove</button></td>
+      </tr>
+    `).join('') || '<tr><td colspan="5" style="text-align:center;padding:1rem">No officials exist.</td></tr>';
+  }catch(e){}
+}
+async function addOfficial(){
+  const user = document.getElementById('offUser').value;
+  const pass = document.getElementById('offPass').value;
+  const area = document.getElementById('offArea').value;
+  const cat = document.getElementById('offCat').value;
+  if(!user || !pass){ alert('Username and Password required'); return; }
+  try{
+    await fetch('/api/officials', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({username:user, password:pass, assigned_area:area, assigned_category:cat})});
+    document.getElementById('offUser').value=''; document.getElementById('offPass').value='';
+    loadOfficials();
+  }catch(e){}
+}
+async function delOfficial(id){
+  if(!confirm('Are you sure you want to remove this official?')) return;
+  await fetch('/api/officials/'+id, {method:'DELETE'});
+  loadOfficials();
+}
+
+// ── Real-Time Socket Connection ─────────────────────────────────
+const socket = io();
+
+socket.on('connect', () => {
+    console.log('📡 Dashboard connected to Real-Time stream');
+});
+
+socket.on('new_complaint', (data) => {
+    console.log('🆕 New complaint received:', data);
+    showToast('🚨 New Complaint', `New ${data.category} issue logged in ${data.area}`);
+    
+    // Refresh dashboard data dynamically
+    loadStats();
+    loadTable();
+    
+    // Update map if it exists
+    if (map) {
+        // Option to add marker or refresh heatmap
+        loadMapData(); // Assuming loadMapData() exists or updateHeatmap is called with new data
+    }
+});
+
+function showToast(title, message) {
+    // Reusing logic if toast exists, otherwise simple console log for now
+    // or we can add a simple toast div to the body
+    const toast = document.createElement('div');
+    toast.style = "position:fixed;bottom:20px;right:20px;background:var(--accent);color:#fff;padding:1rem 1.5rem;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,0.2);z-index:9999;font-weight:600;animation:slideIn 0.3s ease-out";
+    toast.innerHTML = `<strong>${title}</strong><br>${message}`;
+    document.body.appendChild(toast);
+    setTimeout(() => {
+        toast.style.animation = "slideOut 0.3s ease-in";
+        setTimeout(() => toast.remove(), 300);
+    }, 5000);
+}
+
+// Add CSS for toast animations if not present
+const style = document.createElement('style');
+style.innerHTML = `
+@keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+@keyframes slideOut { from { transform: translateX(0); opacity: 1; } to { transform: translateX(100%); opacity: 0; } }
+`;
+document.head.appendChild(style);
+
+async function openAudit(){
+  document.getElementById('auditModal').classList.add('active');
+  const tb = document.getElementById('auditBody');
+  tb.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:2rem">Loading...</td></tr>';
+  try{
+    const r = await fetch('/api/audit_logs');
+    const d = await r.json();
+    tb.innerHTML = d.map(a=>`
+      <tr>
+        <td style="white-space:nowrap;color:var(--muted)">${formatDateTime(a.timestamp)}</td>
+        <td><strong>${a.username}</strong></td>
+        <td><span class="tag" style="background:#f1f3f5;color:var(--ink);font-family:monospace">${a.action}</span></td>
+        <td>${escHtml(a.details)}</td>
+      </tr>
+    `).join('') || '<tr><td colspan="4" style="text-align:center">No logs found.</td></tr>';
+  }catch(e){ tb.innerHTML = '<tr><td colspan="4" style="color:red">Failed to load</td></tr>'; }
+}
+function closeAudit(){ document.getElementById('auditModal').classList.remove('active'); }
+
+checkAuth();
+
+// ── Load & Render ────────────────────────────────────────────────────
+let allComplaints = [];
+let activeComplaints = [];
+let resolvedComplaints = [];
+let highAlertComplaints = [];
+let activePage = 1;
+let resolvedPage = 1;
+const PER_PAGE = 10;
+
+function destroyChart(id){ if(charts[id]){ charts[id].destroy(); delete charts[id]; } }
+
+async function loadTable(){
+  const category = document.getElementById('tCategory').value;
+  const area = document.getElementById('tArea').value;
+  const priority = document.getElementById('tPriority').value;
+  let url = '/api/complaints?';
+  if(category) url += `category=${category}&`;
+  if(priority) url += `priority=${priority}&`;
+  if(area) url += `area=${area}&`;
+  try{
+    const r = await fetch(url);
+    allComplaints = await r.json();
+    activeComplaints = allComplaints.filter(c => c.status !== 'Resolved');
+    resolvedComplaints = allComplaints.filter(c => c.status === 'Resolved');
+    highAlertComplaints = activeComplaints.filter(c => {
+      const daysOpen = getDaysOpen(c.created_at);
+      return c.priority === 'High' || daysOpen > 7 || c.sentiment >= 4;
+    });
+    activePage = 1; resolvedPage = 1;
+    renderHighAlert();
+    renderActiveTable();
+    renderResolvedTable();
+  }catch(e){
+    document.getElementById('activeBody').innerHTML = '<tr><td colspan="10" style="text-align:center;padding:2rem;color:#E63946">Failed to load.</td></tr>';
+  }
+}
+
+function renderActiveRow(c){
+  const photo = c.image_path ? `<img src="/uploads/${c.image_path}" class="photo-thumb" onclick="openLightbox('/uploads/${c.image_path}')" title="View photo">` : '';
+  const daysOpen = getDaysOpen(c.created_at);
+  return `<tr>
+    <td><a href="#" onclick="openTimeline(${c.id});return false" style="color:var(--accent);font-weight:700;text-decoration:none">#${c.id}</a></td>
+    <td style="max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${escHtml(c.title)}">${escHtml(c.title)} ${photo}</td>
+    <td style="font-size:0.9rem">${getSentimentBadge(c.sentiment)}</td>
+    <td><span class="tag tag-cat">${c.category}</span></td>
+    <td><span class="tag tag-pri-${c.priority||'Medium'}">${c.priority||'Medium'}</span></td>
+    <td><span class="tag tag-area">${c.area}</span></td>
+    <td>${escHtml(c.citizen_name||'\u2014')}</td>
+    <td><span class="tag tag-${c.status.replace(' ','_')}">${c.status}</span></td>
+    <td>${getSlaHtml(daysOpen)}<div style="font-size:0.7rem;color:var(--muted)">${formatDate(c.created_at)}</div></td>
+    <td style="font-size:0.82rem;color:var(--muted)">${c.updated_by ? escHtml(c.updated_by) : '\u2014'}</td>
+    <td>
+      <select class="status-select" onchange="updateStatus(${c.id}, this.value)">
+        <option value="Pending"${c.status==='Pending'?' selected':''}>Pending</option>
+        <option value="In Progress"${c.status==='In Progress'?' selected':''}>In Progress</option>
+        <option value="Resolved"${c.status==='Resolved'?' selected':''}>Resolved</option>
+        <option value="Rejected"${c.status==='Rejected'?' selected':''}>Rejected</option>
+      </select>
+    </td>
+  </tr>`;
+}
+
+function renderHighAlert(){
+  const tbody = document.getElementById('alertBody');
+  const badge = document.getElementById('alertCount');
+  badge.textContent = highAlertComplaints.length + ' URGENT';
+  if(!highAlertComplaints.length){
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:1.5rem;color:var(--teal)">\u2705 No high-priority alerts. All clear!</td></tr>';
+    return;
+  }
+  tbody.innerHTML = highAlertComplaints.map(c => {
+    const photo = c.image_path ? `<img src="/uploads/${c.image_path}" class="photo-thumb" onclick="openLightbox('/uploads/${c.image_path}')" title="View photo">` : '';
+    const daysOpen = getDaysOpen(c.created_at);
+    const overdueBadge = daysOpen > 7 ? ' <span class="tag" style="background:var(--accent);color:#fff;margin-left:5px">OVERDUE</span>' : '';
+    const sentimentAlert = c.sentiment >= 4 ? ` <span title="High Sentiment: Citizen is frustrated/angry" style="font-size:1.1rem">${c.sentiment === 5 ? '🔥': '😠'}</span>` : '';
+    return `<tr style="background:#FFF5F5">
+    <td><a href="#" onclick="openTimeline(${c.id});return false" style="color:var(--accent);font-weight:700;text-decoration:none">#${c.id}</a></td>
+    <td style="max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600" title="${escHtml(c.title)}">${escHtml(c.title)} ${photo}${sentimentAlert}${overdueBadge}</td>
+    <td><span class="tag tag-cat">${c.category}</span></td>
+    <td><span class="tag tag-area">${c.area}</span></td>
+    <td>${escHtml(c.citizen_name||'\u2014')}</td>
+    <td><span class="tag tag-${c.status.replace(' ','_')}">${c.status}</span><br><span style="font-size:0.75rem;color:var(--muted)">${getSlaHtml(daysOpen)}</span></td>
+    <td style="font-size:0.85rem">${formatDate(c.created_at)}</td>
+    <td>
+      <select class="status-select" onchange="updateStatus(${c.id}, this.value)">
+        <option value="Pending"${c.status==='Pending'?' selected':''}>Pending</option>
+        <option value="In Progress"${c.status==='In Progress'?' selected':''}>In Progress</option>
+        <option value="Resolved"${c.status==='Resolved'?' selected':''}>Resolved</option>
+        <option value="Rejected"${c.status==='Rejected'?' selected':''}>Rejected</option>
+      </select>
+    </td>
+  </tr>`;
+  }).join('');
+}
+
+function renderResolvedRow(c){
+  const photo = c.image_path ? `<img src="/uploads/${c.image_path}" class="photo-thumb" onclick="openLightbox('/uploads/${c.image_path}')" title="View photo">` : '';
+  return `<tr>
+    <td><a href="#" onclick="openTimeline(${c.id});return false" style="color:var(--accent);font-weight:700;text-decoration:none">#${c.id}</a></td>
+    <td style="max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${escHtml(c.title)}">${escHtml(c.title)} ${photo}</td>
+    <td><span class="tag tag-cat">${c.category}</span></td>
+    <td><span class="tag tag-pri-${c.priority||'Medium'}">${c.priority||'Medium'}</span></td>
+    <td><span class="tag tag-area">${c.area}</span></td>
+    <td>${escHtml(c.citizen_name||'\u2014')}</td>
+    <td style="font-size:0.82rem;color:var(--muted)">${c.updated_by ? escHtml(c.updated_by) : '\u2014'}</td>
+    <td style="font-size:0.85rem">${formatDate(c.created_at)}</td>
+    <td style="font-size:0.85rem;color:var(--teal)">${formatDate(c.resolved_at)}</td>
+    <td class="stars" id="rating-${c.id}">\u2014</td>
+  </tr>`;
+}
+
+function renderActiveTable(){
+  const start = (activePage-1)*PER_PAGE;
+  const page = activeComplaints.slice(start, start+PER_PAGE);
+  const tbody = document.getElementById('activeBody');
+  if(!page.length){ tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:2rem;color:var(--muted)">No active complaints.</td></tr>'; document.getElementById('activePagination').innerHTML=''; return; }
+  tbody.innerHTML = page.map(renderActiveRow).join('');
+  renderPaginationFor('activePagination', activeComplaints.length, activePage, p=>{ activePage=p; renderActiveTable(); });
+}
+
+function renderResolvedTable(){
+  const start = (resolvedPage-1)*PER_PAGE;
+  const page = resolvedComplaints.slice(start, start+PER_PAGE);
+  const tbody = document.getElementById('resolvedBody');
+  if(!page.length){ tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:2rem;color:var(--muted)">No resolved complaints yet.</td></tr>'; document.getElementById('resolvedPagination').innerHTML=''; return; }
+  tbody.innerHTML = page.map(renderResolvedRow).join('');
+  renderPaginationFor('resolvedPagination', resolvedComplaints.length, resolvedPage, p=>{ resolvedPage=p; renderResolvedTable(); });
+  // Load ratings for visible resolved complaints
+  page.forEach(c => loadRating(c.id));
+}
+
+function renderPaginationFor(elId, total, currentPg, goFn){
+  const pages = Math.ceil(total/PER_PAGE);
+  const pg = document.getElementById(elId);
+  if(pages<=1){ pg.innerHTML = `<span class="page-info">${total} complaints</span>`; return; }
+  let html = '';
+  if(currentPg>1) html += `<button>← Prev</button>`;
+  for(let i=1;i<=pages;i++){
+    if(i===currentPg) html += `<button class="active">${i}</button>`;
+    else if(i<=3||i>pages-2||Math.abs(i-currentPg)<=1) html += `<button>${i}</button>`;
+    else if(i===4&&currentPg>5) html += `<span style="padding:0 4px;color:var(--muted)">…</span>`;
+  }
+  if(currentPg<pages) html += `<button>Next →</button>`;
+  html += `<span class="page-info">Page ${currentPg} of ${pages} • ${total} total</span>`;
+  pg.innerHTML = html;
+  pg.querySelectorAll('button').forEach(btn => {
+    const txt = btn.textContent;
+    if(txt==='← Prev') btn.onclick=()=>goFn(currentPg-1);
+    else if(txt==='Next →') btn.onclick=()=>goFn(currentPg+1);
+    else if(!btn.classList.contains('active')) btn.onclick=()=>goFn(parseInt(txt));
+  });
+}
+
+async function updateStatus(id, status){
+  try{
+    const userJson = localStorage.getItem('grip_user');
+    let updated_by = 'Unknown';
+    if(userJson) { const user = JSON.parse(userJson); updated_by = user.username; }
+    const r = await fetch(`/api/complaints/${id}/status`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({status, updated_by})});
+    const d = await r.json();
+    if(d.success){ loadStats(); loadTable(); }
+  }catch(e){}
+}
+// Utilities
+function escHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') }
+function formatDate(d){ if(!d) return '\u2014'; return new Date(d).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}) }
+function formatDateTime(d){ if(!d) return '\u2014'; return new Date(d).toLocaleString('en-IN',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}) }
+function getDaysOpen(d){ if(!d) return 0; return Math.max(0, Math.ceil((new Date() - new Date(d))/(1000*60*60*24))); }
+function getSlaHtml(days){ let c='var(--teal)'; if(days>=4) c='var(--gold)'; if(days>7) c='var(--accent)'; return `<span style="color:${c};font-weight:700">${days} days</span>`; }
+function getSentimentBadge(s){ if(s===5) return '🔥 Angry'; if(s===4) return '😠 Frustr.'; if(s===3) return '😐 Neutral'; if(s===2) return '🙂 Calm'; if(s===1) return '😊 Happy'; return '\u2014'; }
+
+// Timeline Modal
+async function openTimeline(id){
+  document.getElementById('timelineModal').classList.add('active');
+  document.getElementById('timelineTitle').textContent = 'Timeline \u2014 Complaint #'+id;
+  const content = document.getElementById('timelineContent');
+  content.innerHTML = '<p style="color:var(--muted)">Loading\u2026</p>';
+  try{
+    const r = await fetch(`/api/complaints/${id}/history`);
+    const hist = await r.json();
+    if(!hist.length){
+      content.innerHTML = '<p style="color:var(--muted)">No status changes recorded yet.</p>';
+      return;
+    }
+    content.innerHTML = '<div class="timeline">' + hist.map((h,i) =>
+      `<div class="tl-item${i===0?' first':''}">
+        <div class="tl-status">${h.old_status} \u2192 ${h.new_status}</div>
+        <div class="tl-meta">by <strong>${h.changed_by||'System'}</strong> \u2022 ${formatDateTime(h.changed_at)}</div>
+      </div>`
+    ).join('') + '</div>';
+  }catch(e){ content.innerHTML = '<p style="color:var(--accent)">Failed to load timeline.</p>'; }
+}
+function closeTimeline(){ document.getElementById('timelineModal').classList.remove('active'); }
+
+// Lightbox
+function openLightbox(src){ document.getElementById('lightboxImg').src=src; document.getElementById('lightbox').classList.add('active'); }
+function closeLightbox(){ document.getElementById('lightbox').classList.remove('active'); }
+
+// Load rating
+async function loadRating(id){
+  try{
+    const r = await fetch(`/api/complaints/${id}/rating`);
+    const d = await r.json();
+    const el = document.getElementById('rating-'+id);
+    if(el && d.rating){
+      el.innerHTML = '\u2605'.repeat(d.rating) + '\u2606'.repeat(5-d.rating);
+      if(d.feedback_text) el.title = d.feedback_text;
+    }
+  }catch(e){}
+}
+
+loadStats(); loadTable();
+</script>
+</body>
+</html>

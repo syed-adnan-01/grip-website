@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Community — GRIP</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.4/socket.io.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --ink:#0A0A14;--paper:#F4F1EB;--accent:#E63946;--gold:#F4A261;--teal:#2A9D8F;
+  --blue:#264653;--muted:#6B6B7A;--card:#FFFDF7;--border:#DDD9D0;
+}
+body{font-family:'DM Sans',sans-serif;background:var(--paper);color:var(--ink);min-height:100vh;display:flex;flex-direction:column}
+nav{position:fixed;top:0;left:0;right:0;z-index:100;background:var(--ink);padding:0 2.5rem;height:60px;display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid var(--accent)}
+.nav-logo{font-family:'Syne',sans-serif;font-weight:800;font-size:1.3rem;color:#fff}
+.nav-logo span{color:var(--accent)}
+.nav-links{display:flex;gap:0.25rem}
+.nav-links a{color:#ccc;text-decoration:none;font-size:0.85rem;font-weight:500;padding:0.4rem 0.9rem;border-radius:4px;transition:all 0.2s;letter-spacing:0.03em}
+.nav-links a:hover,.nav-links a.active{background:var(--accent);color:#fff}
+
+.page-header{margin-top:60px;background:var(--ink);padding:2rem 2.5rem 1.5rem;border-bottom:1px solid #ffffff15}
+.page-header h1{font-family:'Syne',sans-serif;font-size:1.8rem;font-weight:800;color:#fff;letter-spacing:-0.02em}
+.page-header p{color:#888;margin-top:0.4rem;font-size:0.85rem}
+
+.chat-container{flex:1;display:flex;flex-direction:column;max-width:900px;width:100%;margin:0 auto;padding:1.5rem;overflow:hidden}
+.chat-messages{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:0.75rem;padding:1rem 0;scroll-behavior:smooth}
+
+.msg{display:flex;gap:0.75rem;max-width:85%;animation:fadeIn 0.3s ease}
+.msg.own{align-self:flex-end;flex-direction:row-reverse}
+.msg-avatar{width:36px;height:36px;border-radius:50%;background:var(--teal);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:0.8rem;flex-shrink:0}
+.msg.own .msg-avatar{background:var(--accent)}
+.msg-bubble{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:0.85rem 1.1rem;position:relative}
+.msg.own .msg-bubble{background:#E6394610;border-color:#E6394630}
+.msg-name{font-weight:600;font-size:0.78rem;color:var(--teal);margin-bottom:0.3rem}
+.msg.own .msg-name{color:var(--accent);text-align:right}
+.msg-text{font-size:0.9rem;line-height:1.5;word-break:break-word}
+.msg-time{font-size:0.68rem;color:var(--muted);margin-top:0.35rem}
+.msg.own .msg-time{text-align:right}
+
+.chat-input-bar{display:flex;gap:0.75rem;padding:1rem 0;border-top:1px solid var(--border)}
+.chat-input-bar input{flex:1;padding:0.85rem 1.15rem;border:1.5px solid var(--border);border-radius:50px;font-size:0.92rem;font-family:'DM Sans',sans-serif;outline:none;background:var(--card);transition:border-color 0.2s}
+.chat-input-bar input:focus{border-color:var(--accent)}
+.chat-input-bar button{padding:0.85rem 1.8rem;border:none;border-radius:50px;background:var(--accent);color:#fff;font-weight:700;font-size:0.92rem;cursor:pointer;transition:transform 0.15s,opacity 0.2s;font-family:'DM Sans',sans-serif}
+.chat-input-bar button:hover{transform:translateY(-1px)}
+.chat-input-bar button:active{transform:scale(0.97)}
+
+.online-badge{display:inline-flex;align-items:center;gap:0.4rem;font-size:0.78rem;color:var(--teal);margin-left:1rem}
+.online-dot{width:8px;height:8px;border-radius:50%;background:var(--teal);animation:pulse 2s infinite}
+
+.empty-state{flex:1;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:1rem;color:var(--muted)}
+.empty-state .icon{font-size:3rem}
+.empty-state p{font-size:0.95rem}
+
+.login-prompt{text-align:center;padding:3rem;color:var(--muted)}
+.login-prompt a{color:var(--accent);font-weight:600;text-decoration:none}
+
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
+
+@media(max-width:768px){
+  .chat-container{padding:1rem}
+  .msg{max-width:92%}
+  nav{padding:0 1rem}
+}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-logo">GR<span>IP</span></div>
+  <div class="nav-links">
+    <a href="index.html">Submit Complaint</a>
+    <span id="authLinks" style="display:none">
+      <a href="citizen_dashboard.html">My Complaints</a>
+    </span>
+    <a href="community.html" class="active">Community</a>
+    <a href="#" id="logoutBtn" style="display:none" onclick="logout(event)">Logout</a>
+    <a href="login.html" id="loginBtn">Login</a>
+  </div>
+</nav>
+
+<div class="page-header">
+  <div style="max-width:900px;margin:0 auto;display:flex;align-items:center;justify-content:space-between">
+    <div>
+      <h1>💬 Community Forum</h1>
+      <p>Discuss grievances, share updates, and help fellow citizens</p>
+    </div>
+    <span class="online-badge"><span class="online-dot"></span> Live Chat</span>
+  </div>
+</div>
+
+<div class="chat-container" id="chatContainer">
+  <!-- Login prompt (shown if not logged in) -->
+  <div class="login-prompt" id="loginPrompt" style="display:none">
+    <p style="font-size:1.2rem;margin-bottom:0.5rem">🔐</p>
+    <p>Please <a href="login.html">login</a> to join the community chat.</p>
+  </div>
+
+  <!-- Chat area (shown if logged in) -->
+  <div class="chat-messages" id="chatMessages" style="display:none">
+    <div class="empty-state" id="emptyState">
+      <div class="icon">💬</div>
+      <p>No messages yet. Start the conversation!</p>
+    </div>
+  </div>
+
+  <div class="chat-input-bar" id="chatInputBar" style="display:none">
+    <input type="text" id="chatInput" placeholder="Type your message..." maxlength="500" autocomplete="off">
+    <button id="sendBtn" onclick="sendMessage()">Send</button>
+  </div>
+</div>
+
+<script>
+let currentUser = null;
+let lastMessageId = 0;
+const displayedIds = new Set();
+const socket = io({transports: ['polling', 'websocket']});
+
+// Auth check
+async function checkAuth(){
+  try {
+    const r = await fetch('/api/me');
+    const d = await r.json();
+    if(d.user){
+      currentUser = d.user;
+      document.getElementById('authLinks').style.display = 'inline';
+      document.getElementById('logoutBtn').style.display = 'inline';
+      document.getElementById('loginBtn').style.display = 'none';
+      document.getElementById('chatMessages').style.display = 'flex';
+      document.getElementById('chatInputBar').style.display = 'flex';
+      document.getElementById('loginPrompt').style.display = 'none';
+      loadChatHistory();
+      setInterval(pollNewMessages, 3000);
+    } else {
+      document.getElementById('loginPrompt').style.display = 'block';
+    }
+  } catch(e) {
+    document.getElementById('loginPrompt').style.display = 'block';
+  }
+}
+
+function logout(e){
+  e.preventDefault();
+  document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC;';
+  localStorage.removeItem('grip_user');
+  window.location.href = 'login.html';
+}
+
+// Load chat history
+async function loadChatHistory(){
+  try {
+    const r = await fetch('/api/chat/history');
+    const d = await r.json();
+    if(d.messages && d.messages.length > 0){
+      document.getElementById('emptyState').style.display = 'none';
+      d.messages.forEach(m => {
+        appendOrUpdateMessage(m.username, m.message, m.timestamp, false, m.fullname, m.id);
+      });
+      scrollToBottom();
+    }
+  } catch(e) {
+    console.error('Failed to load chat history', e);
+  }
+}
+
+// Poll for new messages
+async function pollNewMessages(){
+  try {
+    const r = await fetch('/api/chat/history');
+    const d = await r.json();
+    if(d.messages){
+      let hasNew = false;
+      d.messages.forEach(m => {
+        if(m.id > lastMessageId){
+          appendOrUpdateMessage(m.username, m.message, m.timestamp, true, m.fullname, m.id);
+          hasNew = true;
+        }
+      });
+      if(hasNew) scrollToBottom();
+    }
+  } catch(e) {}
+}
+
+/**
+ * Robust message management:
+ * 1. Checks if a message with the same real ID exists.
+ * 2. Checks if a message with the same Client ID exists.
+ * 3. Appends only if truly new.
+ */
+function appendOrUpdateMessage(username, message, timestamp, animate = true, fullname = null, id = null, clientId = null){
+  if(id && displayedIds.has(id)) return;
+  
+  // 1. Try to find existing by Real ID
+  if(id && document.querySelector(`[data-id="${id}"]`)) {
+    displayedIds.add(id);
+    if(id > lastMessageId) lastMessageId = id;
+    return;
+  }
+
+  // 2. Try to find existing by Client ID (for optimistic reconciliation)
+  if(clientId) {
+    const existing = document.querySelector(`[data-client-id="${clientId}"]`);
+    if(existing) {
+      if(id) {
+        existing.setAttribute('data-id', id);
+        displayedIds.add(id);
+        if(id > lastMessageId) lastMessageId = id;
+      }
+      existing.classList.remove('pending');
+      return;
+    }
+  }
+
+  // 3. To be absolutely safe for the sender: 
+  // if it's our message AND we see an identical one without an ID, assume it's ours
+  const isOwn = currentUser && String(username) === String(currentUser.username);
+  if(isOwn && id) {
+     const latestOwn = Array.from(document.querySelectorAll('.msg.own')).pop();
+     if(latestOwn && !latestOwn.getAttribute('data-id') && latestOwn.querySelector('.msg-text').textContent === message) {
+        latestOwn.setAttribute('data-id', id);
+        displayedIds.add(id);
+        if(id > lastMessageId) lastMessageId = id;
+        return;
+     }
+  }
+
+  // 4. Truly new message - Create it
+  const container = document.getElementById('chatMessages');
+  if(document.getElementById('emptyState')) document.getElementById('emptyState').style.display = 'none';
+
+  const displayName = fullname || username;
+  const initials = displayName.slice(0, 2).toUpperCase();
+  const timeStr = new Date(timestamp).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+
+  const div = document.createElement('div');
+  div.className = `msg${isOwn ? ' own' : ''}`;
+  if(id) {
+    div.setAttribute('data-id', id);
+    displayedIds.add(id);
+    if(id > lastMessageId) lastMessageId = id;
+  }
+  if(clientId) div.setAttribute('data-client-id', clientId);
+  if(!animate) div.style.animation = 'none';
+  
+  div.innerHTML = `
+    <div class="msg-avatar">${initials}</div>
+    <div class="msg-bubble">
+      <div class="msg-name">${isOwn ? 'You' : displayName}</div>
+      <div class="msg-text">${escapeHtml(message)}</div>
+      <div class="msg-time">${timeStr}</div>
+    </div>
+  `;
+  container.appendChild(div);
+}
+
+function escapeHtml(text) {
+  const d = document.createElement('div');
+  d.textContent = text;
+  return d.innerHTML;
+}
+
+function scrollToBottom(){
+  const c = document.getElementById('chatMessages');
+  setTimeout(() => { c.scrollTop = c.scrollHeight; }, 50);
+}
+
+async function sendMessage(){
+  const input = document.getElementById('chatInput');
+  const msg = input.value.trim();
+  if(!msg || !currentUser) return;
+
+  const timestamp = new Date().toISOString();
+  const clientId = 'c-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5);
+  
+  // Optimistic display
+  appendOrUpdateMessage(currentUser.username, msg, timestamp, true, currentUser.fullname, null, clientId);
+  scrollToBottom();
+  input.value = '';
+  input.focus();
+
+  try {
+    const r = await fetch('/api/chat/send', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({message: msg, clientId: clientId})
+    });
+    const d = await r.json();
+    if(d.id){
+      appendOrUpdateMessage(currentUser.username, msg, timestamp, false, currentUser.fullname, d.id, clientId);
+    }
+  } catch(e) {
+    console.error('Failed to send message', e);
+  }
+}
+
+socket.on('new_chat_message', (data) => {
+  appendOrUpdateMessage(data.username, data.message, data.timestamp, true, data.fullname, data.id, data.clientId);
+  scrollToBottom();
+});
+
+document.getElementById('chatInput').addEventListener('keydown', (e) => {
+  if(e.key === 'Enter' && !e.shiftKey){
+    e.preventDefault();
+    sendMessage();
+  }
+});
+
+checkAuth();
+</script>
+</body>
+</html>

@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Login — GRIP</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--ink:#0A0A14;--paper:#F4F1EB;--accent:#E63946;--gold:#F4A261;--teal:#2A9D8F;--border:#DDD9D0;}
+body{font-family:'DM Sans',sans-serif;background:var(--paper);color:var(--ink);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:2rem}
+.card{background:#fff;border:1px solid var(--border);border-radius:18px;max-width:380px;width:100%;padding:2.5rem;box-shadow:0 12px 24px rgba(0,0,0,0.08)}
+.logo{font-family:'Syne',sans-serif;font-weight:800;font-size:1.6rem;color:var(--ink);margin-bottom:1rem;text-align:center}
+.logo span{color:var(--accent)}
+.form-group{display:flex;flex-direction:column;gap:0.5rem;margin-bottom:1rem}
+label{font-size:0.8rem;font-weight:600;color:var(--muted)}
+input{padding:0.85rem 1rem;border:1.5px solid var(--border);border-radius:10px;font-size:0.95rem;outline:none;transition:border-color 0.2s}
+input:focus{border-color:var(--accent)}
+.btn{width:100%;padding:0.9rem 1rem;border:none;border-radius:10px;background:var(--accent);color:#fff;font-weight:700;font-size:1rem;cursor:pointer;transition:transform 0.2s}
+.btn:hover{transform:translateY(-1px)}
+.error{margin-bottom:1rem;color:#b00020;font-size:0.9rem;border-left:4px solid #b00020;padding-left:0.75rem}
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo">GR<span>IP</span> Login</div>
+    <div id="errorMsg" class="error" style="display:none"></div>
+    <div style="display:flex;gap:0.5rem;margin-bottom:1.5rem">
+      <button class="btn" id="btnOfficial" style="background:var(--ink);color:#fff" onclick="setRole('official')">Official Login</button>
+      <button class="btn" id="btnCitizen" style="background:var(--paper);color:var(--ink);border:1px solid var(--border)" onclick="setRole('citizen')">Citizen Login</button>
+    </div>
+    
+    <div id="registrationToggle" style="display:none;margin-bottom:1rem;text-align:center;">
+      <span style="font-size:0.85rem;color:var(--muted)">New User?</span> 
+      <a href="#" onclick="toggleRegisterMode()" id="regLink" style="font-size:0.85rem;color:var(--teal);font-weight:600;text-decoration:none">Register Here</a>
+    </div>
+
+    <form id="loginForm" onsubmit="handleLogin(event)" autocomplete="off">
+      <div class="form-group" id="nameGroup" style="display:none">
+        <label for="fullname">Full Name</label>
+        <input id="fullname" name="fullname" type="text" placeholder="Enter your full name">
+      </div>
+      <div class="form-group">
+        <label for="username" id="userLabel">Username</label>
+        <input id="username" name="username" type="text" autocomplete="username" required>
+      </div>
+      <div class="form-group" id="pwdGroup">
+        <label for="password">Password</label>
+        <input id="password" name="password" type="password" autocomplete="current-password" required>
+      </div>
+      <button class="btn" type="submit" id="submitBtn">Login as Official</button>
+    </form>
+    <p id="hintText" style="margin-top:1rem;font-size:0.85rem;color:var(--muted);text-align:center;">Default admin: <strong>admin</strong> / <strong>admin123</strong></p>
+  </div>
+  <script>
+    let currentRole = 'official';
+    let isRegisterMode = false;
+    
+    function setRole(role) {
+      currentRole = role;
+      isRegisterMode = false;
+      const btnO = document.getElementById('btnOfficial');
+      const btnC = document.getElementById('btnCitizen');
+      const userLabel = document.getElementById('userLabel');
+      const submitBtn = document.getElementById('submitBtn');
+      const hintText = document.getElementById('hintText');
+      const errorMsg = document.getElementById('errorMsg');
+      const regToggle = document.getElementById('registrationToggle');
+      const regLink = document.getElementById('regLink');
+      
+      errorMsg.style.display = 'none';
+      document.getElementById('nameGroup').style.display = 'none';
+      regLink.textContent = 'Register Here';
+      document.getElementById('password').value = '';
+      
+      if(role === 'official') {
+        btnO.style.background = 'var(--ink)'; btnO.style.color = '#fff'; btnO.style.border = 'none';
+        btnC.style.background = 'var(--paper)'; btnC.style.color = 'var(--ink)'; btnC.style.border = '1px solid var(--border)';
+        userLabel.textContent = 'Username';
+        submitBtn.textContent = 'Login as Official';
+        hintText.innerHTML = 'Default admin: <strong>admin</strong> / <strong>admin123</strong>';
+        regToggle.style.display = 'none';
+      } else {
+        btnC.style.background = 'var(--ink)'; btnC.style.color = '#fff'; btnC.style.border = 'none';
+        btnO.style.background = 'var(--paper)'; btnO.style.color = 'var(--ink)'; btnO.style.border = '1px solid var(--border)';
+        userLabel.textContent = '10-Digit Phone Number';
+        submitBtn.textContent = 'Login as Citizen';
+        hintText.innerHTML = '';
+        regToggle.style.display = 'block';
+      }
+    }
+    
+    function toggleRegisterMode() {
+      isRegisterMode = !isRegisterMode;
+      const submitBtn = document.getElementById('submitBtn');
+      const regLink = document.getElementById('regLink');
+      const errorMsg = document.getElementById('errorMsg');
+      
+      errorMsg.style.display = 'none';
+      
+      if(isRegisterMode) {
+        submitBtn.textContent = 'Register New Account';
+        submitBtn.style.background = 'var(--teal)';
+        regLink.textContent = 'Back to Login';
+        document.getElementById('nameGroup').style.display = 'flex';
+        document.getElementById('fullname').required = true;
+      } else {
+        submitBtn.textContent = 'Login as Citizen';
+        submitBtn.style.background = 'var(--accent)';
+        regLink.textContent = 'Register Here';
+        document.getElementById('nameGroup').style.display = 'none';
+        document.getElementById('fullname').required = false;
+      }
+    }
+    
+    async function handleLogin(e) {
+      e.preventDefault();
+      const user = document.getElementById('username').value;
+      const pass = document.getElementById('password').value;
+      const err = document.getElementById('errorMsg');
+      const submitBtn = document.getElementById('submitBtn');
+      
+      err.style.display = 'none';
+      submitBtn.disabled = true;
+      submitBtn.textContent = isRegisterMode ? 'Registering...' : 'Authenticating...';
+      
+      try {
+        const endpoint = isRegisterMode ? '/api/register' : '/api/login';
+        const payload = { username: user, password: pass };
+        if(isRegisterMode) {
+          payload.fullname = document.getElementById('fullname').value.trim();
+        }
+        
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        
+        const data = await response.json();
+        
+        if(data.success) {
+          localStorage.setItem('grip_user', JSON.stringify(data.user));
+          window.location.href = data.user.role === 'citizen' ? 'citizen_dashboard.html' : 'dashboard.html';
+        } else {
+          err.textContent = data.error || 'Invalid credentials';
+          err.style.display = 'block';
+          submitBtn.disabled = false;
+          submitBtn.textContent = isRegisterMode ? 'Register New Account' : (currentRole === 'official' ? 'Login as Official' : 'Login as Citizen');
+        }
+      } catch(error) {
+        err.textContent = 'Server connection failed';
+        err.style.display = 'block';
+        submitBtn.disabled = false;
+        submitBtn.textContent = isRegisterMode ? 'Register New Account' : (currentRole === 'official' ? 'Login as Official' : 'Login as Citizen');
+      }
+    }
+  </script>
+</body>
+</html>

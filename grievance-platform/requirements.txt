@@ -1,0 +1,6 @@
+flask
+flask-socketio
+pyjwt
+twilio
+werkzeug
+python-dotenv

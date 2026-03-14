@@ -1,0 +1,57 @@
+# ─── Python ───────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+*.egg
+
+# ─── Virtual Environment ─────────────────────────────
+venv/
+env/
+.env/
+.venv/
+
+# ─── Environment Variables & Secrets ─────────────────
+.env
+.env.local
+.env.production
+*.secret
+config.ini
+secrets.yaml
+secrets.json
+
+# ─── Database Files ──────────────────────────────────
+*.db
+*.sqlite
+*.sqlite3
+
+# ─── Uploaded Files ──────────────────────────────────
+grievance-platform/static/uploads/*
+!grievance-platform/static/uploads/.gitkeep
+
+# ─── IDE & Editor ────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.settings/
+
+# ─── OS Generated Files ─────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ─── Logs ────────────────────────────────────────────
+*.log
+logs/
+
+# ─── JWT / SSL Keys ─────────────────────────────────
+*.pem
+*.key
+*.crt
+*.csr

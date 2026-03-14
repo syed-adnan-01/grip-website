@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GRIP — Fund & Vendor Transparency</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --ink:#0A0A14;--paper:#F4F1EB;--accent:#E63946;--gold:#F4A261;--teal:#2A9D8F;
+  --blue:#264653;--muted:#6B6B7A;--card:#FFFDF7;--border:#DDD9D0;
+  --green:#2A9D8F;
+}
+body{font-family:'DM Sans',sans-serif;background:var(--paper);color:var(--ink);min-height:100vh}
+nav{position:fixed;top:0;left:0;right:0;z-index:100;background:var(--ink);padding:0 2.5rem;height:60px;display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid var(--accent)}
+.nav-logo{font-family:'Syne',sans-serif;font-weight:800;font-size:1.3rem;color:#fff}
+.nav-logo span{color:var(--accent)}
+.nav-links a{color:#ccc;text-decoration:none;font-size:0.85rem;font-weight:500;padding:0.4rem 0.9rem;border-radius:4px;transition:all 0.2s;letter-spacing:0.03em;display:inline-block;margin-left:4px}
+.nav-links a:hover,.nav-links a.active{background:var(--accent);color:#fff}
+
+.page-header{margin-top:60px;background:var(--ink);padding:2.5rem 2.5rem 2rem}
+.page-header h1{font-family:'Syne',sans-serif;font-size:2rem;font-weight:800;color:#fff;letter-spacing:-0.02em}
+.page-header p{color:#888;margin-top:0.5rem;font-size:0.9rem}
+
+.main-wrap{max-width:1400px;margin:0 auto;padding:2.5rem}
+
+/* BUDGET HERO */
+.budget-hero{display:grid;grid-template-columns:1.5fr 1fr 1fr;gap:1.5rem;margin-bottom:2.5rem}
+.budget-main{background:var(--ink);border-radius:16px;padding:2rem;color:#fff;position:relative;overflow:hidden}
+.budget-main::before{content:'';position:absolute;top:-60px;right:-60px;width:200px;height:200px;background:#ffffff06;border-radius:50%}
+.budget-main::after{content:'';position:absolute;bottom:-40px;left:-40px;width:150px;height:150px;background:var(--accent);opacity:0.05;border-radius:50%}
+.budget-eyebrow{font-size:0.72rem;letter-spacing:0.12em;text-transform:uppercase;color:#888;margin-bottom:0.75rem}
+.budget-amount{font-family:'Syne',sans-serif;font-size:2.8rem;font-weight:800;letter-spacing:-0.03em;margin-bottom:0.5rem}
+.budget-label{font-size:0.85rem;color:#999}
+.budget-bar-wrap{margin-top:1.5rem}
+.budget-bar-label{display:flex;justify-content:space-between;font-size:0.78rem;color:#888;margin-bottom:0.5rem}
+.budget-bar{height:8px;background:#ffffff15;border-radius:100px;overflow:hidden}
+.budget-bar-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--gold));border-radius:100px;transition:width 1s ease}
+
+.budget-stat{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:1.75rem;display:flex;flex-direction:column;justify-content:space-between}
+.bs-label{font-size:0.72rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);margin-bottom:0.75rem}
+.bs-amount{font-family:'Syne',sans-serif;font-size:2rem;font-weight:800}
+.bs-sub{font-size:0.8rem;color:var(--muted);margin-top:0.25rem}
+.bs-badge{display:inline-flex;align-items:center;gap:0.3rem;padding:0.3rem 0.7rem;border-radius:100px;font-size:0.72rem;font-weight:600;margin-top:0.75rem}
+
+/* CHARTS */
+.charts-grid{display:grid;grid-template-columns:1.2fr 1fr;gap:1.5rem;margin-bottom:2.5rem}
+.chart-card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:1.75rem}
+.chart-title{font-family:'Syne',sans-serif;font-size:1rem;font-weight:700;margin-bottom:1.5rem;letter-spacing:-0.01em;display:flex;align-items:center;gap:0.5rem}
+.dot{width:8px;height:8px;border-radius:50%}
+.chart-wrap{position:relative;height:280px}
+.full-width{grid-column:1/-1}
+
+/* TABLES */
+.table-card{background:var(--card);border:1px solid var(--border);border-radius:16px;overflow:hidden;margin-bottom:2rem}
+.table-header{padding:1.5rem 1.75rem;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border)}
+.table-header h3{font-family:'Syne',sans-serif;font-size:1rem;font-weight:700}
+.tbl{width:100%;border-collapse:collapse}
+.tbl th{background:var(--paper);padding:0.8rem 1.25rem;text-align:left;font-size:0.72rem;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border)}
+.tbl td{padding:0.9rem 1.25rem;font-size:0.85rem;border-bottom:1px solid var(--border)}
+.tbl tr:last-child td{border-bottom:none}
+.tbl tr:hover td{background:#00000004}
+.tag{padding:0.25rem 0.65rem;border-radius:100px;font-size:0.7rem;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;display:inline-block}
+.tag-Completed{background:#2A9D8F15;color:var(--teal)}
+.tag-Assigned{background:#4361EE15;color:#4361EE}
+.tag-In\ Progress{background:#F4A26115;color:#E07020}
+.tag-Delayed{background:#E6394615;color:var(--accent)}
+.tag-road{background:#26465315;color:var(--blue)}
+.tag-gb{background:#2A9D8F15;color:var(--teal)}
+.tag-el{background:#F4A26115;color:#E07020}
+.tag-wa{background:#4361EE15;color:#4361EE}
+.tag-tr{background:#E6394615;color:var(--accent)}
+
+.stars{color:var(--gold);font-size:0.85rem}
+.stars-empty{color:var(--border)}
+
+/* STAR RATING */
+.rating-bar-wrap{display:flex;align-items:center;gap:0.5rem}
+.rating-bar{flex:1;height:6px;background:var(--border);border-radius:100px;overflow:hidden}
+.rating-fill{height:100%;background:var(--gold);border-radius:100px}
+.rating-num{font-family:'Syne',sans-serif;font-size:0.85rem;font-weight:700;min-width:28px}
+
+/* SECTION HEADERS */
+.section-h{display:flex;align-items:baseline;gap:0.75rem;margin-bottom:1.5rem}
+.section-num{font-family:'Syne',sans-serif;font-size:2.5rem;font-weight:800;color:var(--border)}
+.section-title{font-family:'Syne',sans-serif;font-size:1.4rem;font-weight:700;letter-spacing:-0.02em}
+
+@media(max-width:900px){
+  .budget-hero{grid-template-columns:1fr 1fr}
+  .budget-main{grid-column:1/-1}
+  .charts-grid{grid-template-columns:1fr}
+  .main-wrap{padding:1.5rem}
+  nav{padding:0 1.5rem}
+}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-logo">GR<span>IP</span></div>
+  <div class="nav-links">
+    <a href="index.html">Submit Complaint</a>
+    <span id="authLinks" style="display:none">
+      <a href="dashboard.html">Dashboard</a>
+      <a href="funds.html" class="active">Fund Transparency</a>
+    </span>
+    <a href="#" id="logoutBtn" style="display:none" onclick="logout(event)">Logout</a>
+    <a href="login.html" id="loginBtn">Login</a>
+  </div>
+</nav>
+
+<div class="page-header">
+  <div style="max-width:1400px;margin:0 auto">
+    <h1>💰 Government Fund & Vendor Transparency Dashboard</h1>
+    <p>Track how public funds are allocated and spent on civic complaints — complete contractor accountability</p>
+  </div>
+</div>
+
+<div class="main-wrap">
+  <!-- BUDGET OVERVIEW -->
+  <div class="section-h"><div class="section-num">01</div><div class="section-title">Budget Overview — FY 2024-25</div></div>
+  <div class="budget-hero">
+    <div class="budget-main">
+      <div class="budget-eyebrow">Total Allocated Budget</div>
+      <div class="budget-amount" id="budgetTotal">₹ —</div>
+      <div class="budget-label">Bengaluru Civic Maintenance Fund 2024-25</div>
+      <div class="budget-bar-wrap">
+        <div class="budget-bar-label"><span>Funds Used</span><span id="budgetPct">—%</span></div>
+        <div class="budget-bar"><div class="budget-bar-fill" id="budgetFill" style="width:0%"></div></div>
+      </div>
+    </div>
+    <div class="budget-stat">
+      <div>
+        <div class="bs-label">Funds Utilized</div>
+        <div class="bs-amount" style="color:var(--accent)" id="budgetUsed">₹ —</div>
+        <div class="bs-sub">Spent on complaint resolution</div>
+      </div>
+      <div class="bs-badge" style="background:#E6394615;color:var(--accent)">📊 Allocated to contractors</div>
+    </div>
+    <div class="budget-stat">
+      <div>
+        <div class="bs-label">Remaining Balance</div>
+        <div class="bs-amount" style="color:var(--teal)" id="budgetRemain">₹ —</div>
+        <div class="bs-sub">Available for new projects</div>
+      </div>
+      <div class="bs-badge" style="background:#2A9D8F15;color:var(--teal)">✅ Available funds</div>
+    </div>
+  </div>
+
+  <!-- CHARTS -->
+  <div class="section-h"><div class="section-num">02</div><div class="section-title">Spending Analytics</div></div>
+  <div class="charts-grid">
+    <div class="chart-card full-width">
+      <div class="chart-title"><span class="dot" style="background:var(--accent)"></span>Area-wise Government Spending (₹)</div>
+      <div class="chart-wrap"><canvas id="areaSpendChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title"><span class="dot" style="background:var(--gold)"></span>Fund Allocation by Work Status</div>
+      <div class="chart-wrap"><canvas id="workStatusChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title"><span class="dot" style="background:var(--teal)"></span>Vendor Performance Rating</div>
+      <div class="chart-wrap"><canvas id="vendorRatingChart"></canvas></div>
+    </div>
+  </div>
+
+  <!-- FUND ALLOCATIONS TABLE -->
+  <div class="section-h"><div class="section-num">03</div><div class="section-title">Complaint-wise Fund Allocation</div></div>
+  <div class="table-card">
+    <div class="table-header">
+      <h3>Fund Allocation Records</h3>
+      <span style="font-size:0.82rem;color:var(--muted)" id="allocTotal">Loading…</span>
+    </div>
+    <div style="overflow-x:auto">
+      <table class="tbl">
+        <thead><tr>
+          <th>Alloc #</th><th>Complaint ID</th><th>Issue</th><th>Area</th><th>Category</th>
+          <th>Allocated Fund</th><th>Vendor</th><th>Work Status</th><th>Date</th>
+        </tr></thead>
+        <tbody id="allocBody"><tr><td colspan="9" style="text-align:center;padding:2rem;color:var(--muted)">Loading…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- VENDORS TABLE -->
+  <div class="section-h"><div class="section-num">04</div><div class="section-title">Vendor & Contractor Registry</div></div>
+  <div class="table-card">
+    <div class="table-header">
+      <h3>Registered Vendors</h3>
+      <span style="font-size:0.82rem;color:var(--muted)">Government-approved contractors</span>
+    </div>
+    <div style="overflow-x:auto">
+      <table class="tbl">
+        <thead><tr>
+          <th>#</th><th>Vendor Name</th><th>Work Type</th><th>Contract Value</th>
+          <th>Projects Completed</th><th>Performance Rating</th><th>Contact</th>
+        </tr></thead>
+        <tbody id="vendorBody"><tr><td colspan="7" style="text-align:center;padding:2rem;color:var(--muted)">Loading…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+let areaChart, workStatusChart, vendorChart;
+
+function fmtCrore(v){
+  v = parseFloat(v)||0;
+  if(v>=10000000) return '₹'+((v/10000000).toFixed(2))+' Cr';
+  if(v>=100000) return '₹'+((v/100000).toFixed(1))+' L';
+  return '₹'+v.toLocaleString('en-IN');
+}
+// ── Auth Handling & Protection ─────────────────────────────────────────
+let currentUser = null;
+
+async function checkAuth() {
+  try {
+    const r = await fetch('/api/me');
+    const d = await r.json();
+    if(!d.user || (d.user.role !== 'official' && d.user.role !== 'admin')) {
+      window.location.href = '/login.html';
+      return;
+    }
+    currentUser = d.user;
+    
+    document.getElementById('authLinks').style.display = 'inline-block';
+    document.getElementById('loginBtn').style.display = 'none';
+    const lOut = document.getElementById('logoutBtn');
+    lOut.style.display = 'inline-block';
+    lOut.href = '/logout';
+    lOut.textContent = 'Logout (' + currentUser.username + ')';
+    
+    // Now load data
+    loadSummary();
+    loadAllocations();
+    loadVendors();
+  } catch(e) { window.location.href = '/login.html'; }
+}
+
+function logout(e) {} // Handled by standard a href now
+
+async function loadSummary() {
+  try{
+    const r = await fetch('/api/funds/summary');
+    const d = await r.json();
+    const pct = d.total_budget > 0 ? Math.round((d.funds_used/d.total_budget)*100) : 0;
+    document.getElementById('budgetTotal').textContent = fmtCrore(d.total_budget);
+    document.getElementById('budgetUsed').textContent = fmtCrore(d.funds_used);
+    document.getElementById('budgetRemain').textContent = fmtCrore(d.remaining);
+    document.getElementById('budgetPct').textContent = pct+'%';
+    document.getElementById('budgetFill').style.width = pct+'%';
+  }catch(e){}
+}
+
+async function loadAreaSpending(){
+  try{
+    const r = await fetch('/api/funds/area_spending');
+    const data = await r.json();
+    const ctx = document.getElementById('areaSpendChart').getContext('2d');
+    if(areaChart) areaChart.destroy();
+    areaChart = new Chart(ctx, {
+      type:'bar',
+      data:{
+        labels: data.map(d=>d.area),
+        datasets:[{
+          label:'Total Spent (₹)',
+          data: data.map(d=>parseFloat(d.total_spent)||0),
+          backgroundColor: data.map((_,i)=>`hsl(${(i*37+10)%360},70%,55%)`),
+          borderRadius:8, borderSkipped:false
+        }]
+      },
+      options:{
+        responsive:true, maintainAspectRatio:false,
+        plugins:{legend:{display:false}, tooltip:{callbacks:{label:c=>`Spent: ₹${c.raw.toLocaleString('en-IN')}`}}},
+        scales:{
+          y:{beginAtZero:true, grid:{color:'#00000008'}, ticks:{callback:v=>fmtCrore(v), font:{size:11}}},
+          x:{grid:{display:false}, ticks:{font:{size:11}}}
+        }
+      }
+    });
+  }catch(e){}
+}
+
+async function loadAllocations(){
+  try{
+    const r = await fetch('/api/funds/allocations');
+    const data = await r.json();
+    document.getElementById('allocTotal').textContent = `${data.length} records`;
+    const wsCount = {};
+    const tbody = document.getElementById('allocBody');
+    if(!data.length){
+      tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:2rem;color:var(--muted)">No allocations found. Run setup first.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = data.map(a=>{
+      const ws = a.work_status||'Assigned';
+      wsCount[ws] = (wsCount[ws]||0) + parseFloat(a.allocated_fund||0);
+      return `<tr>
+        <td><strong>#${a.id}</strong></td>
+        <td><strong>#${a.complaint_id}</strong></td>
+        <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escHtml(a.complaint_title||'')}">${escHtml(a.complaint_title||'—')}</td>
+        <td>${a.area||'—'}</td>
+        <td><span class="tag tag-road">${a.category||'—'}</span></td>
+        <td><strong>₹${parseFloat(a.allocated_fund||0).toLocaleString('en-IN')}</strong></td>
+        <td>${escHtml(a.vendor_name||'—')}</td>
+        <td><span class="tag tag-${ws.replace(' ','\ ')}">${ws}</span></td>
+        <td>${formatDate(a.created_at)}</td>
+      </tr>`;
+    }).join('');
+
+    // Work status chart
+    const wCtx = document.getElementById('workStatusChart').getContext('2d');
+    if(workStatusChart) workStatusChart.destroy();
+    workStatusChart = new Chart(wCtx, {
+      type:'doughnut',
+      data:{
+        labels: Object.keys(wsCount),
+        datasets:[{data:Object.values(wsCount), backgroundColor:['#2A9D8F','#F4A261','#4361EE','#E63946'], borderWidth:0, hoverOffset:8}]
+      },
+      options:{
+        responsive:true, maintainAspectRatio:false, cutout:'60%',
+        plugins:{legend:{display:true,position:'bottom',labels:{font:{size:11},padding:12}},
+          tooltip:{callbacks:{label:c=>`₹${c.raw.toLocaleString('en-IN')}`}}}
+      }
+    });
+  }catch(e){}
+}
+
+async function loadVendors(){
+  try{
+    const r = await fetch('/api/vendors');
+    const data = await r.json();
+    const tbody = document.getElementById('vendorBody');
+    if(!data.length){
+      tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:2rem;color:var(--muted)">No vendors found.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = data.map((v,i)=>`
+      <tr>
+        <td><strong>${i+1}</strong></td>
+        <td><strong>${escHtml(v.vendor_name)}</strong></td>
+        <td>${v.work_type||'—'}</td>
+        <td><strong>₹${parseFloat(v.contract_value||0).toLocaleString('en-IN')}</strong></td>
+        <td><span style="font-family:'Syne',sans-serif;font-weight:700">${v.projects_completed||0}</span> projects</td>
+        <td>
+          <div class="rating-bar-wrap">
+            <div class="rating-num">${parseFloat(v.performance_rating||0).toFixed(1)}</div>
+            <div class="rating-bar"><div class="rating-fill" style="width:${(parseFloat(v.performance_rating||0)/5)*100}%"></div></div>
+            <div>${renderStars(parseFloat(v.performance_rating||0))}</div>
+          </div>
+        </td>
+        <td>${v.contact||'—'}</td>
+      </tr>
+    `).join('');
+
+    // Vendor rating chart
+    const vCtx = document.getElementById('vendorRatingChart').getContext('2d');
+    if(vendorChart) vendorChart.destroy();
+    vendorChart = new Chart(vCtx, {
+      type:'bar',
+      data:{
+        labels: data.map(v=>v.vendor_name.split(' ').slice(0,2).join(' ')),
+        datasets:[{
+          data: data.map(v=>parseFloat(v.performance_rating||0)),
+          backgroundColor: data.map(v=>{
+            const r = parseFloat(v.performance_rating||0);
+            if(r>=4.5) return '#2A9D8F'; if(r>=4) return '#F4A261'; return '#E63946';
+          }),
+          borderRadius:6, borderSkipped:false
+        }]
+      },
+      options:{
+        responsive:true, maintainAspectRatio:false,
+        plugins:{legend:{display:false}, tooltip:{callbacks:{label:c=>`Rating: ${c.raw}/5.0`}}},
+        scales:{
+          y:{min:0,max:5,grid:{color:'#00000008'},ticks:{font:{size:11}}},
+          x:{grid:{display:false},ticks:{font:{size:10},maxRotation:30}}
+        }
+      }
+    });
+  }catch(e){}
+}
+
+function renderStars(rating){
+  let s=''; const full=Math.floor(rating); const half=(rating-full)>=0.5;
+  for(let i=0;i<full;i++) s+='<span class="stars">★</span>';
+  if(half) s+='<span class="stars">½</span>';
+  for(let i=0;i<5-full-(half?1:0);i++) s+='<span class="stars-empty">☆</span>';
+  return s;
+}
+
+function escHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') }
+function formatDate(d){ if(!d) return '—'; return new Date(d).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}) }
+
+loadBudget(); loadAreaSpending(); checkAuth();
+</script>
+</body>
+</html>
