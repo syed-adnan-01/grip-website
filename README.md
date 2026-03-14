@@ -117,7 +117,6 @@ This enables **heatmaps of complaint hotspots across the city**.
 
 Security is handled using:
 
-* OTP verification via **Twilio API**
 * **JWT authentication** for session management
 
 ---
