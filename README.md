@@ -371,7 +371,6 @@ This project is licensed under the **MIT License**.
 # 👨‍💻 Author
 
 **Team Quadra Nova**
-Computer Science & Engineering Student
 
 GitHub
 [https://github.com/syed-adnan-01](https://github.com/syed-adnan-01)
