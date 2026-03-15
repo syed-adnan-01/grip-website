@@ -1090,18 +1090,22 @@ def setup_database():
 def init_db():
     try:
         conn = get_db()
-        if not conn: return
+        if not conn: 
+            logging.error("❌ init_db: Could not get DB connection")
+            return
         cursor = conn.cursor()
-        # Use a more generic table check that works for both via db_execute abstraction
-        db_execute(cursor, "SELECT name FROM sqlite_master WHERE type='table' AND name=?", ('users',))
-        if not db_fetchone(cursor):
-            logging.info("🚀 Initializing new database (users table missing)...")
+        
+        # Aggressive check: try to SELECT from users. If it fails, we definitely need setup.
+        try:
+            db_execute(cursor, "SELECT 1 FROM users LIMIT 1")
+            logging.info("✅ Database already initialized (users table accessible).")
+        except Exception as query_error:
+            logging.info(f"💾 Users table missing or inaccessible ({query_error}), triggering setup...")
             setup_database()
-        else:
-            logging.info("✅ Database already initialized (users table exists).")
+            
         conn.close()
     except Exception as e:
-        print(f"DB init error: {e}")
+        logging.error(f"❌ DB init error: {e}")
 
 init_db()
 
