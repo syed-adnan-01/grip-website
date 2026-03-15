@@ -271,7 +271,7 @@ function renderRow(c){
     <td><span class="tag tag-cat">${c.category}</span></td>
     <td><span class="tag tag-pri-${c.priority || 'Medium'}">${c.priority || 'Medium'}</span></td>
     <td><span class="tag tag-area">${c.area}</span></td>
-    <td><span class="tag tag-${c.status.replace(' ','_')}">${c.status}</span></td>
+    <td><span class="tag tag-${(c.status || 'Pending').replace(' ','_')}">${c.status || 'Pending'}</span></td>
     <td>${formatDate(c.created_at)}</td>
     <td>${getSlaHtml(daysOpen)}</td>
   </tr>`;

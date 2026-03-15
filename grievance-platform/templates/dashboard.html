@@ -346,9 +346,11 @@ async function loadStats(){
 
     destroyChart('cat');
     const catCtx = document.getElementById('categoryChart').getContext('2d');
+    const catLabels = (d.by_category || []).map(c=>c.category);
+    const catData = (d.by_category || []).map(c=>c.count);
     charts['cat'] = new Chart(catCtx, {
       type:'bar',
-      data:{ labels: d.by_category.map(c=>c.category), datasets:[{data: d.by_category.map(c=>c.count), backgroundColor: COLORS, borderRadius:6, borderSkipped:false}] },
+      data:{ labels: catLabels, datasets:[{data: catData, backgroundColor: COLORS, borderRadius:6, borderSkipped:false}] },
       options:{...CHART_OPTS, plugins:{...CHART_OPTS.plugins, tooltip:{callbacks:{label:c=>`${c.raw} complaints`}}},
         scales:{y:{beginAtZero:true,grid:{color:'#00000008'},ticks:{font:{size:11}}},x:{grid:{display:false},ticks:{font:{size:11}}}}}
     });
@@ -363,22 +365,24 @@ async function loadStats(){
 
     destroyChart('area');
     const arCtx = document.getElementById('areaChart').getContext('2d');
+    const areaLabels = (d.by_area || []).map(a=>a.area);
+    const areaData = (d.by_area || []).map(a=>a.count);
     charts['area'] = new Chart(arCtx, {
       type:'bar',
-      data:{ labels: d.by_area.map(a=>a.area), datasets:[{data: d.by_area.map(a=>a.count), backgroundColor:'#F4A261', borderRadius:6, borderSkipped:false}] },
+      data:{ labels: areaLabels, datasets:[{data: areaData, backgroundColor:'#F4A261', borderRadius:6, borderSkipped:false}] },
       options:{...CHART_OPTS, indexAxis:'y', scales:{x:{beginAtZero:true,grid:{color:'#00000008'}},y:{grid:{display:false},ticks:{font:{size:11}}}}}
     });
 
     destroyChart('trend');
     const trCtx = document.getElementById('trendChart').getContext('2d');
-    const months = [...d.monthly].reverse();
+    const months = [...(d.monthly || [])].reverse();
     charts['trend'] = new Chart(trCtx, {
       type:'line',
       data:{ labels: months.map(m=>m.month), datasets:[{data: months.map(m=>m.count), borderColor:'#4361EE', backgroundColor:'#4361EE15', tension:0.4, fill:true, pointBackgroundColor:'#4361EE', pointRadius:4, borderWidth:2.5}] },
       options:{...CHART_OPTS, scales:{y:{beginAtZero:true,grid:{color:'#00000008'}},x:{grid:{display:false},ticks:{font:{size:11}}}}}
     });
 
-    updateHeatmap(d.by_area);
+    updateHeatmap(d.by_area || []);
   }catch(e){ console.error(e) }
 }
 
@@ -543,7 +547,7 @@ async function loadTable(){
     renderActiveTable();
     renderResolvedTable();
   }catch(e){
-    document.getElementById('activeBody').innerHTML = '<tr><td colspan="10" style="text-align:center;padding:2rem;color:#E63946">Failed to load.</td></tr>';
+    document.getElementById('activeBody').innerHTML = '<tr><td colspan="11" style="text-align:center;padding:2rem;color:#E63946">Failed to load.</td></tr>';
   }
 }
 
@@ -558,15 +562,15 @@ function renderActiveRow(c){
     <td><span class="tag tag-pri-${c.priority||'Medium'}">${c.priority||'Medium'}</span></td>
     <td><span class="tag tag-area">${c.area}</span></td>
     <td>${escHtml(c.citizen_name||'\u2014')}</td>
-    <td><span class="tag tag-${c.status.replace(' ','_')}">${c.status}</span></td>
+    <td><span class="tag tag-${(c.status || 'Pending').replace(' ','_')}">${c.status || 'Pending'}</span></td>
     <td>${getSlaHtml(daysOpen)}<div style="font-size:0.7rem;color:var(--muted)">${formatDate(c.created_at)}</div></td>
     <td style="font-size:0.82rem;color:var(--muted)">${c.updated_by ? escHtml(c.updated_by) : '\u2014'}</td>
     <td>
       <select class="status-select" onchange="updateStatus(${c.id}, this.value)">
-        <option value="Pending"${c.status==='Pending'?' selected':''}>Pending</option>
-        <option value="In Progress"${c.status==='In Progress'?' selected':''}>In Progress</option>
-        <option value="Resolved"${c.status==='Resolved'?' selected':''}>Resolved</option>
-        <option value="Rejected"${c.status==='Rejected'?' selected':''}>Rejected</option>
+        <option value="Pending"${(c.status||'Pending')==='Pending'?' selected':''}>Pending</option>
+        <option value="In Progress"${(c.status||'Pending')==='In Progress'?' selected':''}>In Progress</option>
+        <option value="Resolved"${(c.status||'Pending')==='Resolved'?' selected':''}>Resolved</option>
+        <option value="Rejected"${(c.status||'Pending')==='Rejected'?' selected':''}>Rejected</option>
       </select>
     </td>
   </tr>`;
@@ -591,14 +595,14 @@ function renderHighAlert(){
     <td><span class="tag tag-cat">${c.category}</span></td>
     <td><span class="tag tag-area">${c.area}</span></td>
     <td>${escHtml(c.citizen_name||'\u2014')}</td>
-    <td><span class="tag tag-${c.status.replace(' ','_')}">${c.status}</span><br><span style="font-size:0.75rem;color:var(--muted)">${getSlaHtml(daysOpen)}</span></td>
+    <td><span class="tag tag-${(c.status || 'Pending').replace(' ','_')}">${c.status || 'Pending'}</span><br><span style="font-size:0.75rem;color:var(--muted)">${getSlaHtml(daysOpen)}</span></td>
     <td style="font-size:0.85rem">${formatDate(c.created_at)}</td>
     <td>
       <select class="status-select" onchange="updateStatus(${c.id}, this.value)">
-        <option value="Pending"${c.status==='Pending'?' selected':''}>Pending</option>
-        <option value="In Progress"${c.status==='In Progress'?' selected':''}>In Progress</option>
-        <option value="Resolved"${c.status==='Resolved'?' selected':''}>Resolved</option>
-        <option value="Rejected"${c.status==='Rejected'?' selected':''}>Rejected</option>
+        <option value="Pending"${(c.status||'Pending')==='Pending'?' selected':''}>Pending</option>
+        <option value="In Progress"${(c.status||'Pending')==='In Progress'?' selected':''}>In Progress</option>
+        <option value="Resolved"${(c.status||'Pending')==='Resolved'?' selected':''}>Resolved</option>
+        <option value="Rejected"${(c.status||'Pending')==='Rejected'?' selected':''}>Rejected</option>
       </select>
     </td>
   </tr>`;
@@ -625,7 +629,7 @@ function renderActiveTable(){
   const start = (activePage-1)*PER_PAGE;
   const page = activeComplaints.slice(start, start+PER_PAGE);
   const tbody = document.getElementById('activeBody');
-  if(!page.length){ tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:2rem;color:var(--muted)">No active complaints.</td></tr>'; document.getElementById('activePagination').innerHTML=''; return; }
+  if(!page.length){ tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;padding:2rem;color:var(--muted)">No active complaints.</td></tr>'; document.getElementById('activePagination').innerHTML=''; return; }
   tbody.innerHTML = page.map(renderActiveRow).join('');
   renderPaginationFor('activePagination', activeComplaints.length, activePage, p=>{ activePage=p; renderActiveTable(); });
 }
@@ -721,7 +725,7 @@ async function loadRating(id){
   }catch(e){}
 }
 
-loadStats(); loadTable();
+// Initial load handled by checkAuth()
 </script>
 </body>
 </html>
