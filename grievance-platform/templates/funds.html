@@ -87,12 +87,29 @@ nav{position:fixed;top:0;left:0;right:0;z-index:100;background:var(--ink);paddin
 .section-num{font-family:'Syne',sans-serif;font-size:2.5rem;font-weight:800;color:var(--border)}
 .section-title{font-family:'Syne',sans-serif;font-size:1.4rem;font-weight:700;letter-spacing:-0.02em}
 
-@media(max-width:900px){
+@media(max-width:1024px){
   .budget-hero{grid-template-columns:1fr 1fr}
   .budget-main{grid-column:1/-1}
   .charts-grid{grid-template-columns:1fr}
   .main-wrap{padding:1.5rem}
-  nav{padding:0 1.5rem}
+}
+
+@media(max-width:768px){
+  nav{padding:0 1rem;height:auto;flex-direction:column;padding-bottom:0.75rem}
+  .nav-logo{margin-top:0.75rem;margin-bottom:0.5rem}
+  .nav-links{flex-wrap:wrap;justify-content:center;gap:0.2rem}
+  .nav-links a{font-size:0.75rem;padding:0.3rem 0.4rem;margin-left:0}
+  
+  .page-header{padding:1.5rem 1rem;text-align:center}
+  .page-header h1{font-size:1.5rem}
+  
+  .budget-hero{grid-template-columns:1fr}
+  .budget-amount{font-size:2rem}
+  .section-num{font-size:1.8rem}
+  .section-title{font-size:1.1rem}
+  
+  .tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .tbl{min-width:800px}
 }
 </style>
 </head>
@@ -174,6 +191,7 @@ nav{position:fixed;top:0;left:0;right:0;z-index:100;background:var(--ink);paddin
       <span style="font-size:0.82rem;color:var(--muted)" id="allocTotal">Loading…</span>
     </div>
     <div style="overflow-x:auto">
+      <div class="tbl-wrap">
       <table class="tbl">
         <thead><tr>
           <th>Alloc #</th><th>Complaint ID</th><th>Issue</th><th>Area</th><th>Category</th>
@@ -192,6 +210,7 @@ nav{position:fixed;top:0;left:0;right:0;z-index:100;background:var(--ink);paddin
       <span style="font-size:0.82rem;color:var(--muted)">Government-approved contractors</span>
     </div>
     <div style="overflow-x:auto">
+      <div class="tbl-wrap">
       <table class="tbl">
         <thead><tr>
           <th>#</th><th>Vendor Name</th><th>Work Type</th><th>Contract Value</th>

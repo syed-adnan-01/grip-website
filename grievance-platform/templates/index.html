@@ -130,12 +130,37 @@ textarea{resize:vertical;min-height:100px}
 @keyframes spin{to{transform:rotate(360deg)}}
 
 /* RESPONSIVE */
+@media(max-width:1024px){
+  .hero{grid-template-columns:1fr;padding:4rem 2rem 3rem;text-align:center}
+  .hero-sub{margin-left:auto;margin-right:auto}
+  .hero-badges{justify-content:center}
+  .main-wrap > div{grid-template-columns:1fr !important;gap:2rem !important}
+}
+
 @media(max-width:768px){
-  .hero{grid-template-columns:1fr;gap:2rem;padding:3rem 1.5rem 2rem}
+  nav{padding:0 1rem;height:auto;flex-direction:column;padding-bottom:0.75rem}
+  .nav-logo{margin-top:0.75rem;margin-bottom:0.5rem}
+  .nav-links{flex-wrap:wrap;justify-content:center;gap:0.2rem}
+  .nav-links a{font-size:0.75rem;padding:0.3rem 0.6rem}
+  
+  .hero h1{font-size:2rem}
+  .section-num{font-size:2rem}
+  .form-card{padding:1.5rem}
   .form-grid{grid-template-columns:1fr}
+  
+  .upload-zone-grid{grid-template-columns:1fr !important}
+  
+  .complaints-grid{grid-template-columns:1fr}
   .quick-links{grid-template-columns:1fr}
-  .main-wrap{padding:2rem 1.5rem}
-  nav{padding:0 1.5rem}
+  
+  .toast{left:1rem;right:1rem;bottom:1rem;max-width:none}
+}
+
+@media(max-width:480px){
+  .hero-stats{grid-template-columns:1fr}
+  .stat-card{padding:1rem}
+  .submit-btn{width:100%;justify-content:center}
+  .upload-zone{padding:1.5rem}
 }
 </style>
 </head>
@@ -230,7 +255,7 @@ textarea{resize:vertical;min-height:100px}
             </div>
             <div class="form-group full">
               <label>Upload Photo (optional)</label>
-              <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem">
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem" class="upload-zone-grid">
                 <div class="upload-zone" id="uploadZone">
                   <div class="upload-icon">📎</div>
                   <div class="upload-text">Drag & drop or <strong>click to browse</strong></div>
