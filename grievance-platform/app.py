@@ -89,8 +89,8 @@ def db_execute(cursor, query, params=None):
     """Abstraction for SQL differences between SQLite and Postgres"""
     if params is None: params = []
     
-    # Check if we are using Postgres (based on the connection type of the cursor)
-    is_pg = DB_URL is not None
+    # Check dynamically for Postgres support
+    is_pg = os.environ.get('DATABASE_URL') is not None or os.environ.get('POSTGRES_URL') is not None
     
     if is_pg:
         query = query.replace('?', '%s')
@@ -108,7 +108,7 @@ def db_execute(cursor, query, params=None):
     return cursor
 
 def db_fetchall(cursor):
-    is_pg = DB_URL is not None
+    is_pg = os.environ.get('DATABASE_URL') is not None or os.environ.get('POSTGRES_URL') is not None
     if is_pg:
         # For Postgres, we use RealDictCursor-like behavior manually if needed, 
         # but easier to just use standard cursor and dict mapping if dicts are needed.
@@ -118,7 +118,7 @@ def db_fetchall(cursor):
         return [dict(r) for r in cursor.fetchall()]
 
 def db_fetchone(cursor):
-    is_pg = DB_URL is not None
+    is_pg = os.environ.get('DATABASE_URL') is not None or os.environ.get('POSTGRES_URL') is not None
     row = cursor.fetchone()
     if not row: return None
     if is_pg:
@@ -517,12 +517,17 @@ def api_me():
 
 @app.route('/api/ping')
 def api_ping():
-    is_pg = DB_URL is not None
+    is_pg = os.environ.get('DATABASE_URL') is not None or os.environ.get('POSTGRES_URL') is not None
     db_conn_status = "untested"
+    tables = []
     try:
         conn = get_db()
         if conn:
             db_conn_status = "connected"
+            cursor = conn.cursor()
+            # Introspect tables
+            db_execute(cursor, "SELECT name FROM sqlite_master WHERE type='table'")
+            tables = [r['name'] for r in db_fetchall(cursor)]
             conn.close()
         else:
             db_conn_status = "failed"
@@ -533,6 +538,7 @@ def api_ping():
         'status': 'ok',
         'db_type': 'postgres' if is_pg else 'sqlite',
         'db_connection': db_conn_status,
+        'tables_found': tables,
         'is_vercel': os.environ.get('VERCEL') is not None,
         'has_pg_driver': HAS_PG,
         'timestamp': datetime.now().isoformat()
@@ -952,13 +958,17 @@ def get_vendors():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-@app.route('/api/setup', methods=['POST'])
-def setup_db():
-    success = setup_database()
-    if success:
-        return jsonify({'success': True, 'message': 'Database setup complete with sample data!'})
-    else:
-        return jsonify({'error': 'Setup failed'}), 500
+@app.route('/api/debug/init-db')
+def force_init_db():
+    try:
+        logging.info("Force-initializing database...")
+        success = setup_database()
+        if success:
+            return jsonify({'status': 'success', 'message': 'Database initialized successfully'})
+        else:
+            return jsonify({'status': 'error', 'message': 'Database initialization failed'}), 500
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
 
 def setup_database():
     try:
@@ -1107,7 +1117,12 @@ def init_db():
     except Exception as e:
         logging.error(f"❌ DB init error: {e}")
 
-init_db()
+@app.before_request
+def first_request_init():
+    if not hasattr(app, '_db_initialized'):
+        logging.info("🚀 First request - initializing database check...")
+        init_db()
+        app._db_initialized = True
 
 if __name__ == '__main__':
     # Ensure local upload folders exist
@@ -1119,3 +1134,6 @@ if __name__ == '__main__':
 else:
     # Vercel / WSGI entry point
     app.logger.info("🚀 GRIP Backend initialized for Serverless/WSGI mode")
+    # Call init_db once at startup for Vercel too
+    with app.app_context():
+        init_db()
