@@ -4,3 +4,4 @@ pyjwt
 twilio
 werkzeug
 python-dotenv
+psycopg2-binary
