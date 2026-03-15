@@ -98,14 +98,11 @@ def db_execute(cursor, query, params=None):
         query = query.replace("INSERT OR REPLACE INTO", "INSERT INTO")
         query = query.replace("INTEGER PRIMARY KEY AUTOINCREMENT", "SERIAL PRIMARY KEY")
         
-        # Add basic strftime support for the stats route
-        if "strftime('%Y-%m', created_at)" in query:
-             query = query.replace("strftime('%Y-%m', created_at)", "to_char(created_at, 'YYYY-MM')")
+        # Universal table check translation
+        if "sqlite_master" in query and "name=" in query:
+             query = "SELECT table_name as name FROM information_schema.tables WHERE table_schema='public' AND table_name=%s"
              
-        # Handle simple sqlite_master checks
-        if "sqlite_master" in query:
-             query = query.replace("SELECT name FROM sqlite_master WHERE type='table' AND name=?", 
-                                 "SELECT table_name FROM information_schema.tables WHERE table_name=%s")
+        # Add basic strftime support for the stats route
     
     cursor.execute(query, params)
     return cursor
