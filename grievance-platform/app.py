@@ -520,11 +520,25 @@ def api_me():
 
 @app.route('/api/ping')
 def api_ping():
+    is_pg = DB_URL is not None
+    db_conn_status = "untested"
+    try:
+        conn = get_db()
+        if conn:
+            db_conn_status = "connected"
+            conn.close()
+        else:
+            db_conn_status = "failed"
+    except Exception as e:
+        db_conn_status = f"error: {str(e)}"
+        
     return jsonify({
         'status': 'ok',
-        'db_path': DB_FILE,
-        'db_exists': os.path.exists(DB_FILE),
-        'is_vercel': os.environ.get('VERCEL') is not None
+        'db_type': 'postgres' if is_pg else 'sqlite',
+        'db_connection': db_conn_status,
+        'is_vercel': os.environ.get('VERCEL') is not None,
+        'has_pg_driver': HAS_PG,
+        'timestamp': datetime.now().isoformat()
     })
 
 @app.route('/')
@@ -1017,7 +1031,7 @@ def setup_database():
         if not admin:
             password_hash = generate_password_hash(admin_password)
             db_execute(cursor, "INSERT INTO users (username, password_hash, role) VALUES (?,?,?)", ('admin', password_hash, 'admin'))
-            print(f"Created default admin user (username=admin password={admin_password})")
+            logging.info(f"✅ Created default admin user (username=admin)")
         else:
             # Force hash if it looks like plain text
             if not admin['password_hash'].startswith(('pbkdf2:sha256:', 'scrypt:')):
@@ -1084,8 +1098,10 @@ def init_db():
         # Use a more generic table check that works for both via db_execute abstraction
         db_execute(cursor, "SELECT name FROM sqlite_master WHERE type='table' AND name=?", ('users',))
         if not db_fetchone(cursor):
-            logging.info("Initializing database...")
+            logging.info("🚀 Initializing new database (users table missing)...")
             setup_database()
+        else:
+            logging.info("✅ Database already initialized (users table exists).")
         conn.close()
     except Exception as e:
         print(f"DB init error: {e}")
