@@ -962,11 +962,11 @@ def get_vendors():
 def force_init_db():
     try:
         logging.info("Force-initializing database...")
-        success = setup_database()
+        success, message = setup_database()
         if success:
-            return jsonify({'status': 'success', 'message': 'Database initialized successfully'})
+            return jsonify({'status': 'success', 'message': message})
         else:
-            return jsonify({'status': 'error', 'message': 'Database initialization failed'}), 500
+            return jsonify({'status': 'error', 'message': message}), 500
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
@@ -1066,7 +1066,20 @@ def setup_database():
         
         db_execute(cursor, "SELECT COUNT(*) as count FROM complaints")
         if db_fetchone(cursor)['count'] == 0:
-            # ... seeding logic ...
+            samples = [
+                ('Deep pothole on main road','Large pothole causing accidents near bus stand','Road','High','Whitefield','Ramesh Kumar','9801234567','Pending'),
+                ('Garbage not collected for 3 days','Waste piling up near apartment complex','Garbage','Medium','Indiranagar','Priya Sharma','9812345678','Resolved'),
+                ('Street light broken since a week','Dark road causing safety issues at night','Electricity','Medium','Koramangala','Arun Nair','9823456789','In Progress'),
+                ('Water supply disrupted','No water supply for past 2 days in the locality','Water','High','Jayanagar','Sunita Reddy','9834567890','Pending'),
+                ('Bus route changed without notice','Bus 310C no longer stops at our stop','Transport','Low','Hebbal','Mohan Das','9845678901','Pending'),
+                ('Road flooded after rain','Drainage blocked causing waterlogging on main road','Water','Medium','BTM Layout','Kavya B','9856789012','Resolved'),
+                ('Open manhole on footpath','Dangerous open manhole not repaired for 2 weeks','Road','High','Marathahalli','Vijay Singh','9867890123','In Progress'),
+                ('Transformers making noise','Loud humming from transformer safety risk','Electricity','Medium','Electronic City','Neha Kapoor','9878901234','Pending'),
+                ('Filthy public park','Public park bins overflowing unhygienic condition','Garbage','Low','Whitefield','Santosh G','9889012345','Resolved'),
+                ('Water pipe leaking','Underground pipe burst causing water wastage','Water','Medium','Indiranagar','Ritu Mehta','9890123456','Pending'),
+                ('Damaged road divider','Road divider broken causing traffic snarls','Road','Low','Koramangala','Arjun P','9901234567','In Progress'),
+                ('No street lights in colony','Entire colony in darkness after 9PM','Electricity','Medium','Hebbal','Deepa M','9912345678','Resolved'),
+            ]
             for s in samples:
                 days_ago = random.randint(1, 90)
                 d = datetime.now() - timedelta(days=days_ago)
@@ -1091,10 +1104,11 @@ def setup_database():
         
         conn.commit()
         conn.close()
-        return True
+        return True, "Database setup complete with sample data!"
     except Exception as e:
-        print(f"Setup error: {e}")
-        return False
+        error_msg = f"Setup error: {str(e)}"
+        logging.error(error_msg)
+        return False, error_msg
 
 # Handle DB initialization
 def init_db():
