@@ -526,15 +526,12 @@ const PER_PAGE = 10;
 function destroyChart(id){ if(charts[id]){ charts[id].destroy(); delete charts[id]; } }
 
 async function loadTable(){
-  const category = document.getElementById('tCategory').value;
-  const area = document.getElementById('tArea').value;
-  const priority = document.getElementById('tPriority').value;
-  let url = '/api/complaints?';
-  if(category) url += `category=${category}&`;
-  if(priority) url += `priority=${priority}&`;
-  if(area) url += `area=${area}&`;
+  const pri = encodeURIComponent(document.getElementById('tPriority').value);
+  const cat = encodeURIComponent(document.getElementById('tCategory').value);
+  const area = encodeURIComponent(document.getElementById('tArea').value);
+  
   try{
-    const r = await fetch(url);
+    const r = await fetch(`/api/complaints?priority=${pri}&category=${cat}&area=${area}`);
     allComplaints = await r.json();
     activeComplaints = allComplaints.filter(c => c.status !== 'Resolved');
     resolvedComplaints = allComplaints.filter(c => c.status === 'Resolved');

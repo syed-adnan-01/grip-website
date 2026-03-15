@@ -233,16 +233,16 @@ async function checkAuth() {
 function logout(e) {} // Handled by standard a href now
 
 async function loadTable(){
-  const category = document.getElementById('tCategory').value;
-  const area = document.getElementById('tArea').value;
-  const priority = document.getElementById('tPriority').value;
+  const cat = encodeURIComponent(document.getElementById('tCategory').value);
+  const area = encodeURIComponent(document.getElementById('tArea').value);
+  const pri = encodeURIComponent(document.getElementById('tPriority').value);
   
   let url = '/api/complaints?';
   if(currentUser){
-    url += `contact=${currentUser.username}&`;
+    url += `contact=${encodeURIComponent(currentUser.username)}&`;
   }
-  if(category) url += `category=${category}&`;
-  if(priority) url += `priority=${priority}&`;
+  if(cat) url += `category=${cat}&`;
+  if(pri) url += `priority=${pri}&`;
   if(area) url += `area=${area}&`;
   
   try{

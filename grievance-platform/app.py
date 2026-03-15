@@ -577,6 +577,7 @@ def get_complaints():
             query += " AND citizen_contact=?"; params.append(contact_filter)
             
         query += " ORDER BY created_at DESC"
+        logging.info(f"🔍 Executing complaint query: {query} with params {params}")
         cursor.execute(query, params)
         complaints = [dict(c) for c in cursor.fetchall()]
         for c in complaints:
@@ -927,12 +928,19 @@ def setup_database():
             id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT NOT NULL,
             message TEXT NOT NULL, timestamp TEXT)""")
         
-        cursor.execute("SELECT COUNT(*) FROM users")
-        if cursor.fetchone()[0] == 0:
-            admin_password = os.environ.get('ADMIN_PASSWORD', 'admin123')
+        cursor.execute("SELECT id, username, password_hash FROM users WHERE username='admin'")
+        admin = cursor.fetchone()
+        admin_password = os.environ.get('ADMIN_PASSWORD', 'admin123')
+        if not admin:
             password_hash = generate_password_hash(admin_password)
             cursor.execute("INSERT INTO users (username, password_hash, role) VALUES (?,?,?)", ('admin', password_hash, 'admin'))
             print(f"Created default admin user (username=admin password={admin_password})")
+        else:
+            # Force hash if it looks like plain text
+            if not admin['password_hash'].startswith(('pbkdf2:sha256:', 'scrypt:')):
+                logging.info("Updating admin password to hashed format...")
+                new_hash = generate_password_hash(admin_password)
+                cursor.execute("UPDATE users SET password_hash=? WHERE id=?", (new_hash, admin['id']))
 
         cursor.execute("SELECT COUNT(*) FROM vendors")
         if cursor.fetchone()[0] == 0:
