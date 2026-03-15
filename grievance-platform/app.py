@@ -51,16 +51,17 @@ def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 # --- Database Configuration --------------------------------------------------
-DB_URL = os.environ.get('DATABASE_URL') or os.environ.get('POSTGRES_URL')
+def is_postgres():
+    return os.environ.get('DATABASE_URL') is not None or os.environ.get('POSTGRES_URL') is not None
 
 def get_db():
     try:
-        if DB_URL:
+        if is_postgres():
             # Postgres mode
             if not HAS_PG:
                 logging.error("❌ Postgres requested but psycopg2 not installed")
                 return None
-            conn = psycopg2.connect(DB_URL)
+            conn = psycopg2.connect(os.environ.get('DATABASE_URL') or os.environ.get('POSTGRES_URL'))
             return conn
         else:
             # SQLite mode
@@ -90,7 +91,7 @@ def db_execute(cursor, query, params=None):
     if params is None: params = []
     
     # Check dynamically for Postgres support
-    is_pg = os.environ.get('DATABASE_URL') is not None or os.environ.get('POSTGRES_URL') is not None
+    is_pg = is_postgres()
     
     if is_pg:
         query = query.replace('?', '%s')
@@ -103,12 +104,14 @@ def db_execute(cursor, query, params=None):
              query = "SELECT table_name as name FROM information_schema.tables WHERE table_schema='public' AND table_name=%s"
              
         # Add basic strftime support for the stats route
+        if "strftime('%Y-%m', created_at)" in query:
+             query = query.replace("strftime('%Y-%m', created_at)", "to_char(created_at::timestamp, 'YYYY-MM')")
     
     cursor.execute(query, params)
     return cursor
 
 def db_fetchall(cursor):
-    is_pg = os.environ.get('DATABASE_URL') is not None or os.environ.get('POSTGRES_URL') is not None
+    is_pg = is_postgres()
     if is_pg:
         # For Postgres, we use RealDictCursor-like behavior manually if needed, 
         # but easier to just use standard cursor and dict mapping if dicts are needed.
@@ -118,7 +121,7 @@ def db_fetchall(cursor):
         return [dict(r) for r in cursor.fetchall()]
 
 def db_fetchone(cursor):
-    is_pg = os.environ.get('DATABASE_URL') is not None or os.environ.get('POSTGRES_URL') is not None
+    is_pg = is_postgres()
     row = cursor.fetchone()
     if not row: return None
     if is_pg:
@@ -352,7 +355,7 @@ def api_register():
         # In Postgres, we need to handle lastrowid differently if we need it, 
         # but for simple registration we just need success.
         # Actually, let's use a safe way to get the ID if needed.
-        if DB_URL:
+        if is_postgres():
             # For PG, we should have used RETURNING id, but let's just fetch it if needed
             db_execute(cursor, "SELECT id FROM users WHERE username=?", (username,))
             user_id = db_fetchone(cursor)['id']
@@ -449,7 +452,7 @@ def chat_send():
         cursor = conn.cursor()
         db_execute(cursor, "INSERT INTO chat_messages (username, message, timestamp) VALUES (?,?,?)",
                        (username, message, timestamp))
-        if DB_URL:
+        if is_postgres():
              # Get the latest ID for this user/message
              db_execute(cursor, "SELECT MAX(id) as id FROM chat_messages WHERE username=?", (username,))
              msg_id = db_fetchone(cursor)['id']
@@ -619,7 +622,7 @@ def submit_complaint():
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'Pending', ?, ?, ?, datetime('now'))""",
             (title, description, category, priority, area, citizen_name, citizen_contact, image_path, sentiment, latitude, longitude))
         
-        if DB_URL:
+        if is_postgres():
             # For PG, we can't easily get lastrowid without RETURNING, so we fetch the last id for this contact
             db_execute(cursor, "SELECT MAX(id) as id FROM complaints WHERE citizen_contact=?", (citizen_contact,))
             complaint_id = db_fetchone(cursor)['id']
@@ -981,7 +984,7 @@ def setup_database():
             latitude REAL, longitude REAL, created_at TEXT, resolved_at TEXT)""")
         
         # Backward compatibility for existing tables (only relevant for SQLite)
-        if not DB_URL:
+        if not is_postgres():
             columns = [
                 ("priority", "TEXT DEFAULT 'Medium'"),
                 ("updated_by", "TEXT DEFAULT ''"),
@@ -1000,7 +1003,7 @@ def setup_database():
             role TEXT DEFAULT 'admin', assigned_area TEXT DEFAULT '', assigned_category TEXT DEFAULT '', fullname TEXT DEFAULT '')""")
             
         # Backward compat for columns
-        if not DB_URL:
+        if not is_postgres():
             try: cursor.execute("ALTER TABLE users ADD COLUMN assigned_area TEXT DEFAULT ''")
             except: pass
             try: cursor.execute("ALTER TABLE users ADD COLUMN assigned_category TEXT DEFAULT ''")
