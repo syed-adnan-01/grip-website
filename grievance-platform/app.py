@@ -44,6 +44,7 @@ ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
+# --- Database Configuration --------------------------------------------------
 DB_FILE_NAME = 'grievance.db'
 if os.environ.get('VERCEL'):
     DB_FILE = os.path.join('/tmp', DB_FILE_NAME)
@@ -56,7 +57,9 @@ if os.environ.get('VERCEL'):
         except Exception as e:
             logging.error(f"❌ Failed to copy DB: {e}")
 else:
-    DB_FILE = DB_FILE_NAME
+    # Use absolute path for local DB to avoid confusion with CWD
+    APP_DIR = os.path.dirname(os.path.abspath(__file__))
+    DB_FILE = os.path.join(APP_DIR, DB_FILE_NAME)
 
 def get_db():
     try:
@@ -239,24 +242,29 @@ def api_login():
         user = cursor.fetchone()
         conn.close()
         
-        if user and check_password_hash(user['password_hash'], password):
-            # Create JWT token
-            token_data = {
-                'id': user['id'],
-                'username': user['username'],
-                'role': user['role'],
-                'fullname': user['fullname'],
-                'assigned_area': user['assigned_area'],
-                'assigned_category': user['assigned_category'],
-                'exp': datetime.utcnow() + timedelta(days=7)
-            }
-            token = jwt.encode(token_data, app.config['SECRET_KEY'], algorithm='HS256')
-            
-            log_audit(user['username'], 'LOGIN', f"User logged in from {request.remote_addr}")
-            
-            resp = jsonify({'success': True, 'user': {'username': user['username'], 'role': user['role'], 'fullname': user['fullname']}})
-            resp.set_cookie('token', token, httponly=True, secure=False, samesite='Lax', max_age=7*24*3600)
-            return resp
+        if user:
+            if check_password_hash(user['password_hash'], password):
+                # Create JWT token
+                token_data = {
+                    'id': user['id'],
+                    'username': user['username'],
+                    'role': user['role'],
+                    'fullname': user['fullname'],
+                    'assigned_area': user['assigned_area'],
+                    'assigned_category': user['assigned_category'],
+                    'exp': datetime.utcnow() + timedelta(days=7)
+                }
+                token = jwt.encode(token_data, app.config['SECRET_KEY'], algorithm='HS256')
+                
+                log_audit(user['username'], 'LOGIN', f"User logged in from {request.remote_addr}")
+                
+                resp = jsonify({'success': True, 'user': {'username': user['username'], 'role': user['role'], 'fullname': user['fullname']}})
+                resp.set_cookie('token', token, httponly=True, secure=False, samesite='Lax', max_age=7*24*3600)
+                return resp
+            else:
+                app.logger.warning(f"❌ Login failed for {username}: Incorrect password")
+        else:
+            app.logger.warning(f"❌ Login failed for {username}: User not found")
         
         return jsonify({'error': 'Invalid username or password'}), 401
     except Exception as e:
@@ -484,9 +492,15 @@ def submit_complaint():
         latitude = data.get('latitude')
         longitude = data.get('longitude')
         
-        # Convert empty strings to None
-        if not latitude: latitude = None
-        if not longitude: longitude = None
+        # Convert and validate numeric fields
+        try:
+            latitude = float(latitude) if latitude else None
+        except:
+            latitude = None
+        try:
+            longitude = float(longitude) if longitude else None
+        except:
+            longitude = None
         
         image_path = None
         if 'image' in request.files:
@@ -982,12 +996,20 @@ def setup_database():
         print(f"Setup error: {e}")
         return False
 
-# Handle DB initialization for regular and serverless environments
-try:
-    if not os.path.exists(DB_FILE):
-        setup_database()
-except Exception as e:
-    print(f"Serverless DB setup check skipped or failed: {e}")
+# Handle DB initialization
+def init_db():
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='users'")
+        if not cursor.fetchone():
+            logging.info("Initializing database...")
+            setup_database()
+        conn.close()
+    except Exception as e:
+        print(f"DB init error: {e}")
+
+init_db()
 
 if __name__ == '__main__':
     # Ensure local upload folders exist

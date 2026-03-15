@@ -262,7 +262,8 @@ async function loadTable(){
 function renderRow(c){
   const photo = c.image_path ? `<img src="/uploads/${c.image_path}" class="photo-thumb" onclick="openLightbox('/uploads/${c.image_path}')" title="View photo">` : '';
   const daysOpen = getDaysOpen(c.created_at);
-  const geoTag = (c.latitude && c.longitude) ? `<div style="font-size:0.7rem;color:var(--teal);margin-top:0.25rem;font-weight:600">📍 Geo: ${c.latitude.toFixed(4)}, ${c.longitude.toFixed(4)}</div>` : '';
+  const hasCoords = c.latitude !== null && c.latitude !== undefined && c.longitude !== null && c.longitude !== undefined && c.latitude !== '' && c.longitude !== '';
+  const geoTag = hasCoords ? `<div style="font-size:0.7rem;color:var(--teal);margin-top:0.25rem;font-weight:600">📍 Geo: ${Number(c.latitude).toFixed(4)}, ${Number(c.longitude).toFixed(4)}</div>` : '';
   
   return `<tr>
     <td><a href="#" onclick="openTimeline(${c.id});return false" style="color:var(--accent);font-weight:700;text-decoration:none">#${c.id}</a></td>

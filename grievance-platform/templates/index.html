@@ -387,7 +387,7 @@ async function checkAuth() {
           contactField.readOnly = true;
           contactField.title = "Contact number is tied to your account";
         }
-        if(nameField && currentUser.display_name) { nameField.value = currentUser.display_name; }
+        if(nameField && currentUser.fullname) { nameField.value = currentUser.fullname; }
       }
     }
   } catch(e) {
