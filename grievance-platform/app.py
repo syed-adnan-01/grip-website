@@ -1031,6 +1031,16 @@ def setup_database():
                     cursor.execute(f"ALTER TABLE complaints ADD COLUMN {col_name} {col_def}")
                 except:
                     pass
+        else:
+            # PostgreSQL: ADD COLUMN IF NOT EXISTS is safe to run repeatedly
+            pg_columns = [
+                ("resolution_proof_path", "TEXT"),
+            ]
+            for col_name, col_type in pg_columns:
+                try:
+                    cursor.execute(f"ALTER TABLE complaints ADD COLUMN IF NOT EXISTS {col_name} {col_type}")
+                except:
+                    pass
         
         db_execute(cursor, """CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT UNIQUE NOT NULL, password_hash TEXT NOT NULL, 
