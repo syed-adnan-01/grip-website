@@ -1031,16 +1031,7 @@ def setup_database():
                     cursor.execute(f"ALTER TABLE complaints ADD COLUMN {col_name} {col_def}")
                 except:
                     pass
-        else:
-            # PostgreSQL: ADD COLUMN IF NOT EXISTS is safe to run repeatedly
-            pg_columns = [
-                ("resolution_proof_path", "TEXT"),
-            ]
-            for col_name, col_type in pg_columns:
-                try:
-                    cursor.execute(f"ALTER TABLE complaints ADD COLUMN IF NOT EXISTS {col_name} {col_type}")
-                except:
-                    pass
+        # NOTE: Postgres migrations are handled separately by run_pg_migrations()
         
         db_execute(cursor, """CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT UNIQUE NOT NULL, password_hash TEXT NOT NULL, 
@@ -1158,8 +1149,36 @@ def setup_database():
         return False, error_msg
 
 # Handle DB initialization
+def run_pg_migrations():
+    """Run Postgres-specific schema migrations in autocommit mode so DDL always commits."""
+    if not is_postgres():
+        return
+    try:
+        conn = get_db()
+        if not conn:
+            return
+        # autocommit=True means each statement commits immediately — DDL cannot be rolled back
+        conn.autocommit = True
+        cursor = conn.cursor()
+        migrations = [
+            "ALTER TABLE complaints ADD COLUMN IF NOT EXISTS resolution_proof_path TEXT",
+        ]
+        for stmt in migrations:
+            try:
+                cursor.execute(stmt)
+                logging.info(f"✅ PG migration OK: {stmt[:60]}")
+            except Exception as e:
+                logging.warning(f"⚠️ PG migration skipped ({stmt[:40]}): {e}")
+        cursor.close()
+        conn.close()
+    except Exception as e:
+        logging.error(f"❌ run_pg_migrations error: {e}")
+
 def init_db():
     try:
+        # Always run postgres migrations first (safe to run every startup)
+        run_pg_migrations()
+
         conn = get_db()
         if not conn: 
             logging.error("❌ init_db: Could not get DB connection")
