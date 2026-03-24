@@ -694,62 +694,26 @@ def get_complaints():
 @app.route('/api/complaints/<int:complaint_id>/status', methods=['PUT'])
 def update_status(complaint_id):
     try:
-        # Accept both multipart/form-data (with proof photo) and JSON (for non-resolved updates)
-        if request.content_type and 'multipart/form-data' in request.content_type:
-            new_status = request.form.get('status')
-        else:
-            data = request.json or {}
-            new_status = data.get('status')
-
-        # Determine who is making the update (from JWT cookie)
-        token = request.cookies.get('token')
-        updated_by_name = 'Unknown'
-        if token:
-            try:
-                token_data = jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])
-                updated_by_name = token_data.get('username', 'Unknown')
-            except Exception:
-                pass
-
-        # Enforce proof photo when resolving
-        resolution_proof_path = None
-        if new_status == 'Resolved':
-            proof_file = request.files.get('proof_image')
-            if not proof_file or not proof_file.filename:
-                return jsonify({'error': 'A proof photo is required to mark a complaint as Resolved.'}), 400
-            if not allowed_file(proof_file.filename):
-                return jsonify({'error': 'Invalid file type. Allowed: png, jpg, jpeg, gif, webp.'}), 400
-            filename = secure_filename(proof_file.filename)
-            ts = datetime.now().strftime('%Y%m%d%H%M%S')
-            filename = f"proof_{complaint_id}_{ts}_{filename}"
-            os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-            proof_file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-            resolution_proof_path = filename
-
+        data = request.json
+        new_status = data.get('status')
+        updated_by_name = request.user['username'] if hasattr(request, 'user') else 'Anonymous'
         conn = get_db()
         cursor = conn.cursor()
         # Get old status for history
         db_execute(cursor, "SELECT status FROM complaints WHERE id=?", (complaint_id,))
         row = db_fetchone(cursor)
         old_status = row['status'] if row else 'Unknown'
-
         if new_status == 'Resolved':
-            db_execute(cursor,
-                "UPDATE complaints SET status=?, updated_by=?, resolved_at=datetime('now'), resolution_proof_path=? WHERE id=?",
-                (new_status, updated_by_name, resolution_proof_path, complaint_id))
+            db_execute(cursor, "UPDATE complaints SET status=?, updated_by=?, resolved_at=datetime('now') WHERE id=?", (new_status, updated_by_name, complaint_id))
         else:
-            db_execute(cursor,
-                "UPDATE complaints SET status=?, updated_by=? WHERE id=?",
-                (new_status, updated_by_name, complaint_id))
-
+            db_execute(cursor, "UPDATE complaints SET status=?, updated_by=? WHERE id=?", (new_status, updated_by_name, complaint_id))
         # Log to history
-        db_execute(cursor,
-            "INSERT INTO complaint_history (complaint_id, old_status, new_status, changed_by, changed_at) VALUES (?, ?, ?, ?, datetime('now'))",
+        db_execute(cursor, "INSERT INTO complaint_history (complaint_id, old_status, new_status, changed_by, changed_at) VALUES (?, ?, ?, ?, datetime('now'))",
             (complaint_id, old_status, new_status, updated_by_name))
-
+        
         # Log to audit table
         log_audit(updated_by_name, 'STATUS_UPDATE', f"Updated complaint #{complaint_id} from {old_status} to {new_status}")
-
+        
         conn.commit()
         conn.close()
         return jsonify({'success': True})
@@ -1017,8 +981,7 @@ def setup_database():
             id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL, description TEXT,
             category TEXT, priority TEXT DEFAULT 'Medium', area TEXT, citizen_name TEXT, citizen_contact TEXT,
             image_path TEXT, status TEXT DEFAULT 'Pending', updated_by TEXT DEFAULT '', sentiment INTEGER DEFAULT 3,
-            latitude REAL, longitude REAL, created_at TEXT, resolved_at TEXT,
-            resolution_proof_path TEXT)""")
+            latitude REAL, longitude REAL, created_at TEXT, resolved_at TEXT)""")
         
         # Backward compatibility for existing tables (only relevant for SQLite)
         if not is_postgres():
@@ -1027,8 +990,7 @@ def setup_database():
                 ("updated_by", "TEXT DEFAULT ''"),
                 ("sentiment", "INTEGER DEFAULT 3"),
                 ("latitude", "REAL"),
-                ("longitude", "REAL"),
-                ("resolution_proof_path", "TEXT")
+                ("longitude", "REAL")
             ]
             for col_name, col_def in columns:
                 try:
