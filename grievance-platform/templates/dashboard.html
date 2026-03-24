@@ -153,6 +153,21 @@ nav{position:fixed;top:0;left:0;right:0;z-index:100;background:var(--ink);paddin
 .audit-table{width:100%;border-collapse:collapse;font-size:0.85rem}
 .audit-table th,.audit-table td{padding:0.75rem;text-align:left;border-bottom:1px solid var(--border)}
 .audit-table th{color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:0.05em;font-size:0.75rem}
+
+/* PROOF UPLOAD MODAL */
+.proof-modal-box{background:var(--card);border-radius:16px;max-width:480px;width:92%;padding:2rem;position:relative;box-shadow:0 20px 60px #00000040;animation:modalIn 0.25s ease-out}
+@keyframes modalIn{from{opacity:0;transform:translateY(-16px)}to{opacity:1;transform:translateY(0)}}
+.proof-drop-zone{border:2px dashed var(--border);border-radius:10px;padding:2rem 1.5rem;text-align:center;cursor:pointer;transition:all 0.2s;background:#fafafa;margin:1.25rem 0}
+.proof-drop-zone:hover,.proof-drop-zone.drag-over{border-color:var(--teal);background:#2A9D8F0D}
+.proof-drop-zone .pz-icon{font-size:2.2rem;margin-bottom:0.5rem}
+.proof-drop-zone .pz-text{font-size:0.85rem;color:var(--muted)}
+.proof-preview{margin-top:0.75rem;display:none}
+.proof-preview img{max-height:160px;border-radius:8px;border:1px solid var(--border);max-width:100%;object-fit:cover}
+.proof-actions{display:flex;gap:0.75rem;justify-content:flex-end;margin-top:1.5rem}
+.btn-teal{background:var(--teal);color:#fff;padding:0.65rem 1.4rem;border:none;border-radius:8px;font-weight:700;font-size:0.88rem;cursor:pointer;transition:background 0.2s;font-family:inherit}
+.btn-teal:hover{background:#22867a}
+.btn-teal:disabled{background:var(--muted);cursor:not-allowed}
+.proof-error{color:var(--accent);font-size:0.82rem;min-height:1.1rem;margin-top:0.5rem}
 </style>
 </head>
 <body>
@@ -286,9 +301,9 @@ nav{position:fixed;top:0;left:0;right:0;z-index:100;background:var(--ink);paddin
     <div class="tbl-wrap">
       <table class="tbl">
         <thead><tr>
-          <th>#ID</th><th>Title</th><th>Category</th><th>Priority</th><th>Area</th><th>Citizen</th><th>Updated By</th><th>Submitted</th><th>Resolved On</th><th>Rating</th>
+          <th>#ID</th><th>Title</th><th>Category</th><th>Priority</th><th>Area</th><th>Citizen</th><th>Updated By</th><th>Submitted</th><th>Resolved On</th><th>Proof</th><th>Rating</th>
         </tr></thead>
-        <tbody id="resolvedBody"><tr><td colspan="10" style="text-align:center;padding:2rem;color:var(--muted)">Loading…</td></tr></tbody>
+        <tbody id="resolvedBody"><tr><td colspan="11" style="text-align:center;padding:2rem;color:var(--muted)">Loading…</td></tr></tbody>
       </table>
     </div>
     <div class="pagination" id="resolvedPagination"></div>
@@ -322,6 +337,29 @@ nav{position:fixed;top:0;left:0;right:0;z-index:100;background:var(--ink);paddin
         </thead>
         <tbody id="auditBody"><tr><td colspan="4" style="text-align:center;padding:2rem">Loading...</td></tr></tbody>
       </table>
+    </div>
+  </div>
+</div>
+
+<!-- RESOLVE WITH PROOF MODAL -->
+<div class="modal-overlay" id="proofModal" onclick="if(event.target===this)cancelProofModal()">
+  <div class="proof-modal-box">
+    <button class="modal-close" onclick="cancelProofModal()">×</button>
+    <div class="modal-title">📸 Upload Resolution Proof</div>
+    <p style="color:var(--muted);font-size:0.88rem;line-height:1.5">A photo proof is required to mark a complaint as <strong>Resolved</strong>. It will be stored and shown in the Resolved Cases table.</p>
+    <div id="proofComplaintInfo" style="margin-top:0.75rem;padding:0.6rem 0.9rem;background:var(--paper);border-radius:8px;border:1px solid var(--border);font-size:0.85rem;font-weight:500"></div>
+    <div class="proof-drop-zone" id="proofDropZone" onclick="document.getElementById('proofFileInput').click()">
+      <div class="pz-icon">🖼️</div>
+      <div class="pz-text">Click or drag &amp; drop a photo here<br><span style="font-size:0.78rem">JPG, PNG, GIF, WEBP accepted</span></div>
+      <input type="file" id="proofFileInput" accept="image/*" style="display:none" onchange="onProofFileSelected(this)">
+    </div>
+    <div class="proof-preview" id="proofPreview">
+      <img id="proofPreviewImg" src="" alt="Proof preview">
+    </div>
+    <div class="proof-error" id="proofError"></div>
+    <div class="proof-actions">
+      <button class="btn btn-outline" onclick="cancelProofModal()">Cancel</button>
+      <button class="btn-teal" id="proofConfirmBtn" onclick="submitProofResolve()">✅ Confirm Resolve</button>
     </div>
   </div>
 </div>
@@ -593,7 +631,7 @@ function renderActiveRow(c){
     <td>${getSlaHtml(daysOpen)}<div style="font-size:0.7rem;color:var(--muted)">${formatDate(c.created_at)}</div></td>
     <td style="font-size:0.82rem;color:var(--muted)">${c.updated_by ? escHtml(c.updated_by) : '\u2014'}</td>
     <td>
-      <select class="status-select" onchange="updateStatus(${c.id}, this.value)">
+      <select class="status-select" data-prev="${c.status||'Pending'}" onchange="updateStatus(${c.id}, this.value, this)">
         <option value="Pending"${(c.status||'Pending')==='Pending'?' selected':''}>Pending</option>
         <option value="In Progress"${(c.status||'Pending')==='In Progress'?' selected':''}>In Progress</option>
         <option value="Resolved"${(c.status||'Pending')==='Resolved'?' selected':''}>Resolved</option>
@@ -625,7 +663,7 @@ function renderHighAlert(){
     <td><span class="tag tag-${(c.status || 'Pending').replace(' ','_')}">${c.status || 'Pending'}</span><br><span style="font-size:0.75rem;color:var(--muted)">${getSlaHtml(daysOpen)}</span></td>
     <td style="font-size:0.85rem">${formatDate(c.created_at)}</td>
     <td>
-      <select class="status-select" onchange="updateStatus(${c.id}, this.value)">
+      <select class="status-select" data-prev="${c.status||'Pending'}" onchange="updateStatus(${c.id}, this.value, this)">
         <option value="Pending"${(c.status||'Pending')==='Pending'?' selected':''}>Pending</option>
         <option value="In Progress"${(c.status||'Pending')==='In Progress'?' selected':''}>In Progress</option>
         <option value="Resolved"${(c.status||'Pending')==='Resolved'?' selected':''}>Resolved</option>
@@ -637,7 +675,10 @@ function renderHighAlert(){
 }
 
 function renderResolvedRow(c){
-  const photo = c.image_path ? `<img src="/uploads/${c.image_path}" class="photo-thumb" onclick="openLightbox('/uploads/${c.image_path}')" title="View photo">` : '';
+  const photo = c.image_path ? `<img src="/uploads/${c.image_path}" class="photo-thumb" onclick="openLightbox('/uploads/${c.image_path}')" title="View complaint photo">` : '';
+  const proofThumb = c.resolution_proof_path
+    ? `<img src="/uploads/${c.resolution_proof_path}" class="photo-thumb" onclick="openLightbox('/uploads/${c.resolution_proof_path}')" title="View resolution proof" style="border:2px solid var(--teal)">`
+    : '<span style="color:var(--muted);font-size:0.78rem">\u2014</span>';
   return `<tr>
     <td><a href="#" onclick="openTimeline(${c.id});return false" style="color:var(--accent);font-weight:700;text-decoration:none">#${c.id}</a></td>
     <td style="max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${escHtml(c.title)}">${escHtml(c.title)} ${photo}</td>
@@ -648,6 +689,7 @@ function renderResolvedRow(c){
     <td style="font-size:0.82rem;color:var(--muted)">${c.updated_by ? escHtml(c.updated_by) : '\u2014'}</td>
     <td style="font-size:0.85rem">${formatDate(c.created_at)}</td>
     <td style="font-size:0.85rem;color:var(--teal)">${formatDate(c.resolved_at)}</td>
+    <td>${proofThumb}</td>
     <td class="stars" id="rating-${c.id}">\u2014</td>
   </tr>`;
 }
@@ -665,7 +707,7 @@ function renderResolvedTable(){
   const start = (resolvedPage-1)*PER_PAGE;
   const page = resolvedComplaints.slice(start, start+PER_PAGE);
   const tbody = document.getElementById('resolvedBody');
-  if(!page.length){ tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:2rem;color:var(--muted)">No resolved complaints yet.</td></tr>'; document.getElementById('resolvedPagination').innerHTML=''; return; }
+  if(!page.length){ tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;padding:2rem;color:var(--muted)">No resolved complaints yet.</td></tr>'; document.getElementById('resolvedPagination').innerHTML=''; return; }
   tbody.innerHTML = page.map(renderResolvedRow).join('');
   renderPaginationFor('resolvedPagination', resolvedComplaints.length, resolvedPage, p=>{ resolvedPage=p; renderResolvedTable(); });
   // Load ratings for visible resolved complaints
@@ -694,12 +736,86 @@ function renderPaginationFor(elId, total, currentPg, goFn){
   });
 }
 
-async function updateStatus(id, status){
+// ── Resolve-with-Proof Modal ─────────────────────────────────────
+let _pendingResolveId = null;
+let _pendingResolveSelectEl = null;
+let _pendingResolvePrevValue = null;
+
+function resolveWithProof(id, selectEl, prevValue) {
+  _pendingResolveId = id;
+  _pendingResolveSelectEl = selectEl;
+  _pendingResolvePrevValue = prevValue;
+  document.getElementById('proofComplaintInfo').textContent = `Complaint #${id}`;
+  document.getElementById('proofFileInput').value = '';
+  document.getElementById('proofPreview').style.display = 'none';
+  document.getElementById('proofPreviewImg').src = '';
+  document.getElementById('proofError').textContent = '';
+  document.getElementById('proofConfirmBtn').disabled = false;
+  document.getElementById('proofConfirmBtn').textContent = '\u2705 Confirm Resolve';
+  document.getElementById('proofModal').classList.add('active');
+}
+
+function onProofFileSelected(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    document.getElementById('proofPreviewImg').src = e.target.result;
+    document.getElementById('proofPreview').style.display = 'block';
+  };
+  reader.readAsDataURL(file);
+}
+
+async function submitProofResolve() {
+  const errEl = document.getElementById('proofError');
+  const confirmBtn = document.getElementById('proofConfirmBtn');
+  const fileInput = document.getElementById('proofFileInput');
+  errEl.textContent = '';
+  if (!fileInput.files || !fileInput.files[0]) {
+    errEl.textContent = '\u26a0\ufe0f Please select a proof photo before confirming.';
+    return;
+  }
+  confirmBtn.disabled = true;
+  confirmBtn.textContent = 'Submitting\u2026';
+  const fd = new FormData();
+  fd.append('status', 'Resolved');
+  fd.append('proof_image', fileInput.files[0]);
+  try {
+    const r = await fetch(`/api/complaints/${_pendingResolveId}/status`, { method: 'PUT', body: fd });
+    const d = await r.json();
+    if (d.success) {
+      document.getElementById('proofModal').classList.remove('active');
+      loadStats(); loadTable();
+    } else {
+      errEl.textContent = '\u274c ' + (d.error || 'Failed to resolve complaint.');
+      confirmBtn.disabled = false;
+      confirmBtn.textContent = '\u2705 Confirm Resolve';
+      if (_pendingResolveSelectEl) _pendingResolveSelectEl.value = _pendingResolvePrevValue;
+    }
+  } catch(e) {
+    errEl.textContent = '\u274c Network error. Please try again.';
+    confirmBtn.disabled = false;
+    confirmBtn.textContent = '\u2705 Confirm Resolve';
+    if (_pendingResolveSelectEl) _pendingResolveSelectEl.value = _pendingResolvePrevValue;
+  }
+}
+
+function cancelProofModal() {
+  document.getElementById('proofModal').classList.remove('active');
+  if (_pendingResolveSelectEl) _pendingResolveSelectEl.value = _pendingResolvePrevValue;
+  _pendingResolveId = null; _pendingResolveSelectEl = null; _pendingResolvePrevValue = null;
+}
+
+async function updateStatus(id, status, selectEl){
+  if (status === 'Resolved') {
+    const prevValue = (selectEl && selectEl.dataset.prev) ? selectEl.dataset.prev : 'Pending';
+    resolveWithProof(id, selectEl, prevValue);
+    return;
+  }
   try{
-    const userJson = localStorage.getItem('grip_user');
-    let updated_by = 'Unknown';
-    if(userJson) { const user = JSON.parse(userJson); updated_by = user.username; }
-    const r = await fetch(`/api/complaints/${id}/status`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({status, updated_by})});
+    const fd = new FormData();
+    fd.append('status', status);
+    const r = await fetch(`/api/complaints/${id}/status`,{method:'PUT',body:fd});
     const d = await r.json();
     if(d.success){ loadStats(); loadTable(); }
   }catch(e){}

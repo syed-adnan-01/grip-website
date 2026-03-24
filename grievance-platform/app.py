@@ -694,9 +694,38 @@ def get_complaints():
 @app.route('/api/complaints/<int:complaint_id>/status', methods=['PUT'])
 def update_status(complaint_id):
     try:
-        data = request.json
-        new_status = data.get('status')
-        updated_by_name = request.user['username'] if hasattr(request, 'user') else 'Anonymous'
+        # Accept multipart/form-data (proof photo) or JSON (for non-resolved updates)
+        if request.content_type and 'multipart/form-data' in request.content_type:
+            new_status = request.form.get('status')
+        else:
+            data = request.json or {}
+            new_status = data.get('status')
+
+        # Determine the updater from the JWT cookie
+        token = request.cookies.get('token')
+        updated_by_name = 'Unknown'
+        if token:
+            try:
+                token_data = jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])
+                updated_by_name = token_data.get('username', 'Unknown')
+            except Exception:
+                pass
+
+        # Require proof photo when resolving
+        resolution_proof_path = None
+        if new_status == 'Resolved':
+            proof_file = request.files.get('proof_image')
+            if not proof_file or not proof_file.filename:
+                return jsonify({'error': 'A proof photo is required to mark a complaint as Resolved.'}), 400
+            if not allowed_file(proof_file.filename):
+                return jsonify({'error': 'Invalid file type. Allowed: png, jpg, jpeg, gif, webp.'}), 400
+            filename = secure_filename(proof_file.filename)
+            ts = datetime.now().strftime('%Y%m%d%H%M%S')
+            filename = f"proof_{complaint_id}_{ts}_{filename}"
+            os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+            proof_file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+            resolution_proof_path = filename
+
         conn = get_db()
         cursor = conn.cursor()
         # Get old status for history
@@ -704,9 +733,12 @@ def update_status(complaint_id):
         row = db_fetchone(cursor)
         old_status = row['status'] if row else 'Unknown'
         if new_status == 'Resolved':
-            db_execute(cursor, "UPDATE complaints SET status=?, updated_by=?, resolved_at=datetime('now') WHERE id=?", (new_status, updated_by_name, complaint_id))
+            db_execute(cursor,
+                "UPDATE complaints SET status=?, updated_by=?, resolved_at=datetime('now'), resolution_proof_path=? WHERE id=?",
+                (new_status, updated_by_name, resolution_proof_path, complaint_id))
         else:
-            db_execute(cursor, "UPDATE complaints SET status=?, updated_by=? WHERE id=?", (new_status, updated_by_name, complaint_id))
+            db_execute(cursor, "UPDATE complaints SET status=?, updated_by=? WHERE id=?",
+                (new_status, updated_by_name, complaint_id))
         # Log to history
         db_execute(cursor, "INSERT INTO complaint_history (complaint_id, old_status, new_status, changed_by, changed_at) VALUES (?, ?, ?, ?, datetime('now'))",
             (complaint_id, old_status, new_status, updated_by_name))
@@ -981,7 +1013,8 @@ def setup_database():
             id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL, description TEXT,
             category TEXT, priority TEXT DEFAULT 'Medium', area TEXT, citizen_name TEXT, citizen_contact TEXT,
             image_path TEXT, status TEXT DEFAULT 'Pending', updated_by TEXT DEFAULT '', sentiment INTEGER DEFAULT 3,
-            latitude REAL, longitude REAL, created_at TEXT, resolved_at TEXT)""")
+            latitude REAL, longitude REAL, created_at TEXT, resolved_at TEXT,
+            resolution_proof_path TEXT)""")
         
         # Backward compatibility for existing tables (only relevant for SQLite)
         if not is_postgres():
@@ -990,13 +1023,15 @@ def setup_database():
                 ("updated_by", "TEXT DEFAULT ''"),
                 ("sentiment", "INTEGER DEFAULT 3"),
                 ("latitude", "REAL"),
-                ("longitude", "REAL")
+                ("longitude", "REAL"),
+                ("resolution_proof_path", "TEXT")
             ]
             for col_name, col_def in columns:
                 try:
                     cursor.execute(f"ALTER TABLE complaints ADD COLUMN {col_name} {col_def}")
                 except:
                     pass
+        # NOTE: Postgres migrations are handled separately by run_pg_migrations()
         
         db_execute(cursor, """CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT UNIQUE NOT NULL, password_hash TEXT NOT NULL, 
@@ -1114,8 +1149,36 @@ def setup_database():
         return False, error_msg
 
 # Handle DB initialization
+def run_pg_migrations():
+    """Run Postgres-specific schema migrations in autocommit mode so DDL always commits."""
+    if not is_postgres():
+        return
+    try:
+        conn = get_db()
+        if not conn:
+            return
+        # autocommit=True means each statement commits immediately — DDL cannot be rolled back
+        conn.autocommit = True
+        cursor = conn.cursor()
+        migrations = [
+            "ALTER TABLE complaints ADD COLUMN IF NOT EXISTS resolution_proof_path TEXT",
+        ]
+        for stmt in migrations:
+            try:
+                cursor.execute(stmt)
+                logging.info(f"✅ PG migration OK: {stmt[:60]}")
+            except Exception as e:
+                logging.warning(f"⚠️ PG migration skipped ({stmt[:40]}): {e}")
+        cursor.close()
+        conn.close()
+    except Exception as e:
+        logging.error(f"❌ run_pg_migrations error: {e}")
+
 def init_db():
     try:
+        # Always run postgres migrations first (safe to run every startup)
+        run_pg_migrations()
+
         conn = get_db()
         if not conn: 
             logging.error("❌ init_db: Could not get DB connection")
